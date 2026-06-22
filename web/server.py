@@ -100,17 +100,30 @@ def api_chat():
             yield f"data: {json.dumps({'phase': 'source', 'content': _cerveau.llm.modele_actif or 'llm'})}\n\n"
 
             reponse_complete = ""
+            llm_erreur = False
             with _llm_lock:
                 for phase, contenu in _cerveau.llm.repondre_stream(
                     texte_llm, nom_utilisateur=_cerveau.nom_utilisateur
                 ):
+                    if phase == "erreur":
+                        llm_erreur = True
+                        # Désactive le backend défaillant pour cette session
+                        _cerveau.llm._backend = None
+                        _cerveau.llm.modele_actif = None
+                        break
                     yield f"data: {json.dumps({'phase': phase, 'content': contenu})}\n\n"
                     if phase == "repondre":
                         reponse_complete += contenu
-                    elif phase in ("done", "erreur"):
+                    elif phase == "done":
                         break
 
-            if reponse_complete:
+            if llm_erreur:
+                # Fallback réseau neuronal
+                yield f"data: {json.dumps({'phase': 'source', 'content': 'ia'})}\n\n"
+                reponse, _ = _cerveau.repondre(message)
+                yield f"data: {json.dumps({'phase': 'repondre', 'content': reponse})}\n\n"
+                yield f"data: {json.dumps({'phase': 'done', 'content': reponse})}\n\n"
+            elif reponse_complete:
                 _cerveau.enregistrer_echange_llm(message, reponse_complete)
         else:
             yield f"data: {json.dumps({'phase': 'source', 'content': 'ia'})}\n\n"

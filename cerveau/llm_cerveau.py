@@ -354,16 +354,15 @@ class LLMCerveau:
             self.modele_actif = "gemini-api"
             return
 
-        # 3. Modèle local DeepSeek
-        if _MODELE_DEEPSEEK_LOCAL.exists():
-            self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
-            self.modele_actif = "deepseek-local"
-            return
-
-        # 4. Modèle local Kimi
-        if _MODELE_KIMI_LOCAL.exists():
-            self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
-            self.modele_actif = "kimi-local"
+        # 3. Modèle local — uniquement si llama-cpp est installé
+        if self._llama_cpp_disponible():
+            if _MODELE_DEEPSEEK_LOCAL.exists():
+                self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
+                self.modele_actif = "deepseek-local"
+                return
+            if _MODELE_KIMI_LOCAL.exists():
+                self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
+                self.modele_actif = "kimi-local"
 
     def charger(self, modele: str = "deepseek") -> tuple[bool, str]:
         """Charge manuellement un backend spécifique (commande /modele)."""
@@ -459,13 +458,22 @@ class LLMCerveau:
         return self._backend is not None
 
     @staticmethod
+    def _llama_cpp_disponible() -> bool:
+        try:
+            import importlib.util
+            return importlib.util.find_spec("llama_cpp") is not None
+        except Exception:
+            return False
+
+    @staticmethod
     def modeles_disponibles() -> dict[str, bool]:
         _charger_env()
         cle_ds = os.environ.get("DEEPSEEK_API_KEY", "")
         cle_gem = os.environ.get("GEMINI_API_KEY", "")
+        llama_ok = LLMCerveau._llama_cpp_disponible()
         return {
             "deepseek-api":   bool(cle_ds and not cle_ds.startswith("sk-REMPLACE")),
             "gemini-api":     bool(cle_gem and not cle_gem.startswith("AIzaSy_REMPLACE")),
-            "deepseek-local": _MODELE_DEEPSEEK_LOCAL.exists(),
-            "kimi-local":     _MODELE_KIMI_LOCAL.exists(),
+            "deepseek-local": llama_ok and _MODELE_DEEPSEEK_LOCAL.exists(),
+            "kimi-local":     llama_ok and _MODELE_KIMI_LOCAL.exists(),
         }
