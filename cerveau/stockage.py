@@ -33,8 +33,9 @@ def _maintenant() -> float:
 class Stockage:
     """Accès thread-safe à la base SQLite de UNION IA."""
 
-    def __init__(self, db_path: Path = DB_PATH):
-        self.db_path = Path(db_path)
+    def __init__(self, db_path: Path | None = None):
+        # Résolu dynamiquement → un override de stockage.DB_PATH (tests) est pris en compte
+        self.db_path = Path(db_path) if db_path is not None else DB_PATH
         self.db_path.parent.mkdir(exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)

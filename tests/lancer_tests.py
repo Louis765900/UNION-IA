@@ -15,6 +15,7 @@ MODULES = [
     "tests.test_memoire_active",
     "tests.test_llm_parser",
     "tests.test_cerveau",
+    "tests.test_server",
 ]
 
 

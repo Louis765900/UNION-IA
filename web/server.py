@@ -1,7 +1,20 @@
+"""
+Serveur web de UNION IA (Flask).
+
+Expose l'interface de chat et une API REST/SSE complète :
+  - conversations persistantes (créer, lister, charger, supprimer, rechercher)
+  - mémoire active (voir, modifier, oublier)
+  - gamme de modes (2.1 / Flash / Flashlight) et choix du moteur
+
+L'initialisation (réseau neuronal + moteur LLM) se fait en arrière-plan pour
+un démarrage instantané.
+"""
+
 import json
 import sys
 import threading
 from pathlib import Path
+
 from flask import Flask, Response, request, jsonify
 
 WEB_DIR = Path(__file__).parent
@@ -10,95 +23,140 @@ sys.path.insert(0, str(BASE_DIR))
 
 from cerveau.entraineur import Entraineur
 from cerveau.cerveau import Cerveau
-from cerveau.llm_cerveau import LLMCerveau
+from cerveau.llm_cerveau import LLMCerveau, MODES
 
 app = Flask(__name__)
 _llm_lock = threading.Lock()
 _init_done = threading.Event()
 
-# ── Init en arrière-plan pour ne pas bloquer le démarrage ──────────────────────
-_entraineur: Entraineur | None = None
 _cerveau: Cerveau | None = None
+# Conversation active côté serveur (l'historique LLM lui est lié)
+_conv_active: int | None = None
+
 
 def _initialiser():
-    global _entraineur, _cerveau
+    global _cerveau
     print("UNION IA — chargement du réseau neuronal...")
-    _entraineur = Entraineur()
-    _entraineur.entrainer(force=False)
-    print("UNION IA — connexion au backend LLM...")
-    _cerveau = Cerveau(_entraineur)
+    entraineur = Entraineur()
+    entraineur.entrainer(force=False)
+    print("UNION IA — connexion au moteur LLM...")
+    _cerveau = Cerveau(entraineur)
     backend = _cerveau.llm.stats().get("modele", "Réseau neuronal") if _cerveau.llm.actif else "Réseau neuronal"
-    print(f"Backend : {backend}")
+    print(f"Moteur : {backend}")
     _init_done.set()
     print("Prêt → http://127.0.0.1:5000")
 
+
 threading.Thread(target=_initialiser, daemon=True).start()
 
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 def _serve(filename: str):
     path = WEB_DIR / filename
     return Response(path.read_text(encoding="utf-8"), mimetype="text/html")
 
+
 def _attendre_init():
-    """Attend que l'init soit terminée (max 60s)."""
     _init_done.wait(timeout=60)
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+
+def _charger_conversation(conv_id: int):
+    """Bascule la conversation active et recharge l'historique LLM associé."""
+    global _conv_active
+    _conv_active = conv_id
+    messages = _cerveau.stockage.lister_messages(conv_id)
+    hist = []
+    user_courant = None
+    for m in messages:
+        if m["role"] == "user":
+            user_courant = m["contenu"]
+        elif m["role"] == "assistant" and user_courant is not None:
+            hist.append({"user": user_courant, "assistant": m["contenu"]})
+            user_courant = None
+    _cerveau.llm.charger_historique(hist)
+
+
+def _titre_depuis(message: str) -> str:
+    t = message.strip().replace("\n", " ")
+    return (t[:55] + "…") if len(t) > 55 else t or "Nouvelle conversation"
+
+
+# ── Pages ──────────────────────────────────────────────────────────────────────
+
 @app.route("/")
 def index():
     return _serve("index.html")
+
 
 @app.route("/settings")
 def settings():
     return _serve("settings.html")
 
+
+# ── Statut ─────────────────────────────────────────────────────────────────────
+
 @app.route("/api/status")
 def api_status():
     if not _init_done.is_set():
         return jsonify({
-            "llm_actif": False,
-            "modele": "Démarrage en cours…",
-            "modele_id": None,
             "initialisation": True,
+            "llm_actif": False,
+            "modele": "Démarrage…",
+            "modele_id": None,
+            "mode": "2.1",
             "version": "2.1.0",
             "utilisateur": "Louis",
-            "messages_session": 0,
-            "total_messages": 0,
-            "total_sessions": 0,
-            "apprentissages": 0,
         })
     stats = _cerveau.llm.stats() if _cerveau.llm.actif else {}
     return jsonify({
+        "initialisation": False,
         "llm_actif": _cerveau.llm.actif,
         "modele": stats.get("modele", "Réseau neuronal"),
-        "modele_id": _cerveau.llm.modele_actif,
-        "echanges_llm": stats.get("echanges", 0),
+        "modele_id": _cerveau.llm.moteur_id,
+        "mode": _cerveau.llm.mode,
+        "mode_label": stats.get("mode_label", "UNION IA 2.1"),
         "version": "2.1.0",
         "utilisateur": _cerveau.nom_utilisateur or "Louis",
         "messages_session": _cerveau.total_messages_session,
-        "total_messages": _cerveau.memoire.get("total_messages", 0),
-        "total_sessions": _cerveau.memoire.get("total_sessions", 0),
+        "total_messages": _cerveau.memoire["total_messages"],
+        "total_sessions": _cerveau.memoire["total_sessions"],
         "apprentissages": len(_cerveau.apprentissages),
-        "initialisation": False,
+        "faits": len(_cerveau.stockage.lister_faits()),
     })
+
+
+# ── Chat (SSE) ─────────────────────────────────────────────────────────────────
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     _attendre_init()
+    global _conv_active
     data = request.get_json(force=True, silent=True) or {}
     message = (data.get("message") or "").strip()
+    conv_id = data.get("conversation_id")
     if not message:
         return jsonify({"error": "Message vide"}), 400
 
+    # Conversation : créer ou reprendre
+    if conv_id and _cerveau.stockage.conversation_existe(conv_id):
+        if _conv_active != conv_id:
+            _charger_conversation(conv_id)
+    else:
+        conv_id = _cerveau.stockage.creer_conversation(_titre_depuis(message))
+        _conv_active = conv_id
+        _cerveau.llm.vider_historique()
+
+    _cerveau.stockage.ajouter_message(conv_id, "user", message)
     texte_llm, fichiers = _cerveau.injecter_fichiers(message)
 
     def generate():
+        yield f"data: {json.dumps({'phase': 'conversation', 'content': conv_id})}\n\n"
         if fichiers:
             yield f"data: {json.dumps({'phase': 'fichiers', 'content': fichiers})}\n\n"
 
         if _cerveau.llm.actif and _cerveau.besoin_llm(message):
-            yield f"data: {json.dumps({'phase': 'source', 'content': _cerveau.llm.modele_actif or 'llm'})}\n\n"
-
+            yield f"data: {json.dumps({'phase': 'source', 'content': _cerveau.llm.moteur_id or 'llm'})}\n\n"
             reponse_complete = ""
             llm_erreur = False
             with _llm_lock:
@@ -107,9 +165,7 @@ def api_chat():
                 ):
                     if phase == "erreur":
                         llm_erreur = True
-                        # Désactive le backend défaillant pour cette session
-                        _cerveau.llm._backend = None
-                        _cerveau.llm.modele_actif = None
+                        _cerveau.llm.desactiver()
                         break
                     yield f"data: {json.dumps({'phase': phase, 'content': contenu})}\n\n"
                     if phase == "repondre":
@@ -118,18 +174,24 @@ def api_chat():
                         break
 
             if llm_erreur:
-                # Fallback réseau neuronal
                 yield f"data: {json.dumps({'phase': 'source', 'content': 'ia'})}\n\n"
                 reponse, _ = _cerveau.repondre(message)
                 yield f"data: {json.dumps({'phase': 'repondre', 'content': reponse})}\n\n"
                 yield f"data: {json.dumps({'phase': 'done', 'content': reponse})}\n\n"
-            elif reponse_complete:
+                reponse_complete = reponse
+            else:
                 _cerveau.enregistrer_echange_llm(message, reponse_complete)
+
+            if reponse_complete:
+                _cerveau.stockage.ajouter_message(
+                    conv_id, "assistant", reponse_complete, modele=_cerveau.llm.moteur_id
+                )
         else:
             yield f"data: {json.dumps({'phase': 'source', 'content': 'ia'})}\n\n"
             reponse, _ = _cerveau.repondre(message)
             yield f"data: {json.dumps({'phase': 'repondre', 'content': reponse})}\n\n"
             yield f"data: {json.dumps({'phase': 'done', 'content': reponse})}\n\n"
+            _cerveau.stockage.ajouter_message(conv_id, "assistant", reponse, modele="ia")
 
     return Response(
         generate(),
@@ -141,27 +203,134 @@ def api_chat():
         },
     )
 
-@app.route("/api/history")
-def api_history_get():
-    _attendre_init()
-    return jsonify({"history": _cerveau.messages_session[-20:]})
 
-@app.route("/api/history", methods=["DELETE"])
-def api_history_delete():
+# ── Conversations ──────────────────────────────────────────────────────────────
+
+@app.route("/api/conversations")
+def api_conversations():
     _attendre_init()
-    _cerveau.messages_session.clear()
-    _cerveau.total_messages_session = 0
-    if _cerveau.llm.actif:
+    return jsonify({"conversations": _cerveau.stockage.lister_conversations()})
+
+
+@app.route("/api/conversations", methods=["POST"])
+def api_conversation_creer():
+    _attendre_init()
+    global _conv_active
+    cid = _cerveau.stockage.creer_conversation()
+    _conv_active = cid
+    _cerveau.llm.vider_historique()
+    return jsonify({"id": cid})
+
+
+@app.route("/api/conversations/<int:conv_id>")
+def api_conversation_charger(conv_id):
+    _attendre_init()
+    if not _cerveau.stockage.conversation_existe(conv_id):
+        return jsonify({"error": "Conversation introuvable"}), 404
+    _charger_conversation(conv_id)
+    return jsonify({
+        "id": conv_id,
+        "messages": _cerveau.stockage.lister_messages(conv_id),
+    })
+
+
+@app.route("/api/conversations/<int:conv_id>", methods=["DELETE"])
+def api_conversation_supprimer(conv_id):
+    _attendre_init()
+    global _conv_active
+    _cerveau.stockage.supprimer_conversation(conv_id)
+    if _conv_active == conv_id:
+        _conv_active = None
         _cerveau.llm.vider_historique()
     return jsonify({"success": True})
 
+
+@app.route("/api/conversations/<int:conv_id>/titre", methods=["POST"])
+def api_conversation_renommer(conv_id):
+    _attendre_init()
+    data = request.get_json(force=True, silent=True) or {}
+    titre = (data.get("titre") or "").strip()
+    if titre:
+        _cerveau.stockage.renommer_conversation(conv_id, titre)
+    return jsonify({"success": True})
+
+
+@app.route("/api/search")
+def api_search():
+    _attendre_init()
+    requete = (request.args.get("q") or "").strip()
+    if not requete:
+        return jsonify({"resultats": []})
+    return jsonify({"resultats": _cerveau.stockage.rechercher_messages(requete)})
+
+
+# ── Mémoire active ─────────────────────────────────────────────────────────────
+
+@app.route("/api/memory")
+def api_memory():
+    _attendre_init()
+    return jsonify({
+        "faits": _cerveau.stockage.lister_faits(),
+        "profil": _cerveau.stockage.profil_tout(),
+        "apprentissages": _cerveau.stockage.apprentissages_tout(),
+    })
+
+
+@app.route("/api/memory", methods=["POST"])
+def api_memory_ajouter():
+    _attendre_init()
+    data = request.get_json(force=True, silent=True) or {}
+    cle = (data.get("cle") or "").strip()
+    valeur = (data.get("valeur") or "").strip()
+    categorie = (data.get("categorie") or "general").strip()
+    if not cle or not valeur:
+        return jsonify({"error": "cle et valeur requises"}), 400
+    _cerveau.stockage.memoriser_fait(cle, valeur, categorie, source="manuel")
+    return jsonify({"success": True})
+
+
+@app.route("/api/memory/<path:cle>", methods=["DELETE"])
+def api_memory_oublier(cle):
+    _attendre_init()
+    _cerveau.stockage.oublier_fait(cle)
+    return jsonify({"success": True})
+
+
+@app.route("/api/memory", methods=["DELETE"])
+def api_memory_vider():
+    _attendre_init()
+    _cerveau.stockage.vider_faits()
+    return jsonify({"success": True})
+
+
+# ── Modes & moteurs ────────────────────────────────────────────────────────────
+
+@app.route("/api/modes")
+def api_modes():
+    return jsonify({
+        "modes": [{"id": k, "label": v["label"]} for k, v in MODES.items()],
+        "actif": _cerveau.llm.mode if _init_done.is_set() else "2.1",
+    })
+
+
+@app.route("/api/mode", methods=["POST"])
+def api_mode():
+    _attendre_init()
+    data = request.get_json(force=True, silent=True) or {}
+    mode = (data.get("mode") or "").strip()
+    ok, msg = _cerveau.llm.changer_mode(mode)
+    if ok:
+        return jsonify({"success": True, "mode": _cerveau.llm.mode, "label": msg})
+    return jsonify({"success": False, "error": msg}), 400
+
+
 @app.route("/api/modeles")
 def api_modeles():
-    disponibles = LLMCerveau.modeles_disponibles()
     return jsonify({
-        "disponibles": disponibles,
-        "actif": _cerveau.llm.modele_actif if _init_done.is_set() else None,
+        "disponibles": LLMCerveau.modeles_disponibles(),
+        "actif": _cerveau.llm.moteur_id if _init_done.is_set() else None,
     })
+
 
 @app.route("/api/modele", methods=["POST"])
 def api_changer_modele():
@@ -173,8 +342,21 @@ def api_changer_modele():
     with _llm_lock:
         ok, msg = _cerveau.charger_llm(modele)
     if ok:
-        return jsonify({"success": True, "message": msg, "modele": _cerveau.llm.modele_actif})
+        return jsonify({"success": True, "message": msg, "modele": _cerveau.llm.moteur_id})
     return jsonify({"success": False, "error": msg}), 400
+
+
+# ── Profil ─────────────────────────────────────────────────────────────────────
+
+@app.route("/api/profil", methods=["POST"])
+def api_profil():
+    _attendre_init()
+    data = request.get_json(force=True, silent=True) or {}
+    nom = (data.get("nom") or "").strip()
+    if nom:
+        _cerveau.nom_utilisateur = nom
+    return jsonify({"success": True, "nom": _cerveau.nom_utilisateur})
+
 
 if __name__ == "__main__":
     print("UNION IA — démarrage...")
