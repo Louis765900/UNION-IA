@@ -25,6 +25,21 @@
   --ok:      #00e676;
   --err:     #ff4444;
 }
+:root[data-theme="light"] {
+  --bg:      #f6f8fb;
+  --surface: #ffffff;
+  --sfc-low: #eef1f6;
+  --sfc-mid: #e7ebf2;
+  --sfc-hi:  #dde3ec;
+  --border:  #d6dce6;
+  --cyan:    #0091b8;
+  --cyan-p:  #0077a3;
+  --txt:     #16202e;
+  --txt-dim: #6b7689;
+  --txt-mid: #3f4a5c;
+  --ok:      #00a152;
+  --err:     #d23b3b;
+}
 body {
   font-family: 'Geist', sans-serif;
   background: var(--bg);
@@ -33,6 +48,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background 0.2s, color 0.2s;
 }
 .jb { font-family: 'JetBrains Mono', monospace; }
 .msym {
@@ -47,7 +63,6 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ── Top bar ── */
 header {
   display: flex;
   justify-content: space-between;
@@ -55,8 +70,7 @@ header {
   padding: 0 24px;
   height: 56px;
   border-bottom: 1px solid var(--border);
-  background: rgba(10,13,20,0.85);
-  backdrop-filter: blur(14px);
+  background: var(--bg);
   position: sticky;
   top: 0;
   z-index: 30;
@@ -75,10 +89,7 @@ header {
 .icon-btn:hover { background: var(--sfc-mid); color: var(--cyan); }
 .icon-btn.active { color: var(--cyan); background: var(--sfc-hi); }
 
-/* ── Layout ── */
 .layout { display: flex; flex: 1; }
-
-/* ── Sidebar ── */
 nav {
   width: 260px;
   height: calc(100vh - 56px);
@@ -128,11 +139,10 @@ nav {
   color: var(--cyan); font-weight: 700; font-size: 14px;
 }
 
-/* ── Content ── */
 main {
   flex: 1;
   padding: 40px 32px;
-  max-width: 800px;
+  max-width: 820px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -141,7 +151,6 @@ main {
 .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; }
 .page-sub { color: var(--txt-dim); font-size: 14px; margin: 0; }
 
-/* ── Sections ── */
 .section {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -154,7 +163,6 @@ main {
   gap: 8px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
-  background: rgba(255,255,255,0.01);
   color: var(--cyan);
   font-size: 14px;
   font-weight: 600;
@@ -162,7 +170,6 @@ main {
 .section-body { padding: 18px; display: flex; flex-direction: column; gap: 16px; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-/* ── Form fields ── */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label {
   font-family: 'JetBrains Mono', monospace;
@@ -171,110 +178,20 @@ main {
   letter-spacing: 0.06em;
   color: var(--txt-dim);
 }
-.field-select {
+.field-select, .field-input {
   width: 100%;
   background: var(--sfc-low);
   border: 1px solid var(--border);
   color: var(--txt);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Geist', sans-serif;
   font-size: 13px;
   border-radius: 7px;
   padding: 9px 12px;
   appearance: none;
-  cursor: pointer;
   transition: border-color 0.15s;
 }
-.field-select:focus { outline: none; border-color: var(--cyan); }
+.field-select:focus, .field-input:focus { outline: none; border-color: var(--cyan); }
 
-/* ── GPU widget ── */
-.gpu-widget {
-  background: var(--sfc-low);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px 16px;
-}
-.gpu-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.gpu-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--ok);
-}
-.gpu-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--ok);
-  animation: pulse 2s infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
-.gpu-name { font-size: 20px; font-weight: 700; color: var(--txt); }
-.gpu-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--txt-dim); }
-.gpu-bar-track { height: 3px; background: var(--sfc-hi); border-radius: 2px; margin-top: 10px; }
-.gpu-bar-fill { height: 100%; background: var(--cyan); border-radius: 2px; width: 0%; transition: width 0.5s; }
-
-/* ── Stats row ── */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.stat-card {
-  background: var(--sfc-low);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px 16px;
-}
-.stat-value { font-size: 24px; font-weight: 700; color: var(--txt); margin: 0 0 4px; }
-.stat-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--txt-dim); margin: 0; }
-
-/* ── Toggle ── */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-}
-.toggle-row:last-of-type { border-bottom: none; }
-.toggle-info { flex: 1; padding-right: 16px; }
-.toggle-title { font-size: 14px; font-weight: 500; color: var(--txt); margin: 0 0 3px; }
-.toggle-desc { font-size: 12px; color: var(--txt-dim); margin: 0; }
-.toggle-switch {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  flex-shrink: 0;
-}
-.toggle-switch input { opacity: 0; width: 0; height: 0; }
-.toggle-track {
-  position: absolute;
-  inset: 0;
-  background: var(--sfc-hi);
-  border-radius: 100px;
-  cursor: pointer;
-  transition: background 0.2s;
-  border: 1px solid var(--border);
-}
-.toggle-switch input:checked + .toggle-track { background: var(--cyan); border-color: var(--cyan); }
-.toggle-track::after {
-  content: '';
-  position: absolute;
-  top: 2px; left: 2px;
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: var(--txt-dim);
-  transition: transform 0.2s, background 0.2s;
-}
-.toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); background: #0a0d14; }
-
-/* ── Read-only field ── */
 .readonly-field {
   display: flex;
   align-items: center;
@@ -286,35 +203,95 @@ main {
   color: var(--txt-mid);
   font-size: 14px;
 }
-
-/* ── Buttons ── */
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  color: var(--err);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  padding: 3px 9px; border-radius: 100px;
+  border: 1px solid var(--border); color: var(--txt-dim);
 }
-.btn-danger:hover { background: rgba(255,68,68,0.08); border-color: var(--err); }
+.pill.ok { color: var(--ok); border-color: var(--ok); }
 
-/* ── About ── */
-.about-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat-card {
   background: var(--sfc-low);
   border: 1px solid var(--border);
   border-radius: 8px;
+  padding: 14px 16px;
+}
+.stat-value { font-size: 24px; font-weight: 700; color: var(--txt); margin: 0 0 4px; }
+.stat-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--txt-dim); margin: 0; }
+
+/* Mémoire active */
+.fact-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.fact {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--sfc-low);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.fact-cat {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--cyan); background: var(--sfc-hi);
+  padding: 2px 7px; border-radius: 4px; flex-shrink: 0;
+}
+.fact-val { flex: 1; font-size: 13.5px; color: var(--txt); }
+.fact-del {
+  background: none; border: none; color: var(--txt-dim);
+  cursor: pointer; border-radius: 5px; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s, color 0.1s; flex-shrink: 0;
+}
+.fact-del:hover { background: rgba(210,59,59,0.1); color: var(--err); }
+.fact-empty { color: var(--txt-dim); font-size: 13px; text-align: center; padding: 20px; font-style: italic; }
+.add-fact-row { display: flex; gap: 8px; }
+.add-fact-row .field-input { flex: 1; }
+
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-of-type { border-bottom: none; }
+.toggle-info { flex: 1; padding-right: 16px; }
+.toggle-title { font-size: 14px; font-weight: 500; color: var(--txt); margin: 0 0 3px; }
+.toggle-desc { font-size: 12px; color: var(--txt-dim); margin: 0; }
+.toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  background: var(--sfc-hi); border-radius: 100px; cursor: pointer;
+  transition: background 0.2s; border: 1px solid var(--border);
+}
+.toggle-switch input:checked + .toggle-track { background: var(--cyan); border-color: var(--cyan); }
+.toggle-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--txt-dim); transition: transform 0.2s, background 0.2s;
+}
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); background: var(--surface); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; background: var(--cyan); color: var(--bg);
+  border: none; border-radius: 7px; font-weight: 600;
+  font-size: 12px; cursor: pointer; transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-danger {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; background: transparent; border: 1px solid var(--border);
+  border-radius: 7px; color: var(--err);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.05em; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-danger:hover { background: rgba(210,59,59,0.08); border-color: var(--err); }
+
+.about-card {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; background: var(--sfc-low);
+  border: 1px solid var(--border); border-radius: 8px;
 }
 .about-name { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; color: var(--cyan); margin: 0 0 4px; }
 .about-desc { font-size: 13px; color: var(--txt-dim); margin: 0; }
@@ -322,13 +299,9 @@ main {
 .about-by { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--txt-dim); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 4px; }
 .about-dev { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--txt); margin: 0; }
 .version-badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--txt-dim);
-  background: var(--sfc-low);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 3px 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--txt-dim);
+  background: var(--sfc-low); border: 1px solid var(--border);
+  border-radius: 5px; padding: 3px 8px;
 }
 </style>
 </head>
@@ -337,9 +310,10 @@ main {
 <header>
   <a href="/" class="logo">UNION IA</a>
   <div class="hdr-actions">
-    <a href="/" class="icon-btn" title="Chat">
-      <span class="msym">chat</span>
-    </a>
+    <button class="icon-btn" onclick="toggleTheme()" title="Clair / sombre">
+      <span class="msym" id="theme-icon">light_mode</span>
+    </button>
+    <a href="/" class="icon-btn" title="Chat"><span class="msym">chat</span></a>
     <a href="/settings" class="icon-btn active" title="Paramètres">
       <span class="msym" style="font-variation-settings:'FILL' 1,'wght' 400">settings</span>
     </a>
@@ -347,176 +321,112 @@ main {
 </header>
 
 <div class="layout">
-
-  <!-- Sidebar -->
   <nav>
     <div class="nav-body">
       <div class="nav-section">Navigation</div>
-      <a href="/" class="nav-item">
-        <span class="msym" style="font-size:18px">chat</span>
-        Conversations
-      </a>
-      <a href="/settings" class="nav-item active">
-        <span class="msym" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400">settings</span>
-        Paramètres
-      </a>
+      <a href="/" class="nav-item"><span class="msym" style="font-size:18px">chat</span>Conversations</a>
+      <a href="/settings" class="nav-item active"><span class="msym" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400">settings</span>Paramètres</a>
     </div>
     <div class="nav-footer">
       <div class="nav-avatar" id="nav-initial">L</div>
       <div>
         <div style="font-size:14px;font-weight:500;color:var(--txt)" id="nav-name">Louis</div>
-        <div class="jb" style="font-size:10px;color:var(--txt-dim)">Local Instance</div>
+        <div class="jb" style="font-size:10px;color:var(--txt-dim)">Instance locale</div>
       </div>
     </div>
   </nav>
 
-  <!-- Content -->
   <main>
-
     <div class="page-header">
       <h1 class="page-title">Paramètres</h1>
-      <p class="page-sub">Configuration du système et préférences de l'instance locale.</p>
+      <p class="page-sub">Moteur, gamme, mémoire et préférences de UNION IA.</p>
     </div>
 
-    <!-- Section : Modèle IA -->
+    <!-- Moteur & gamme -->
     <div class="section">
-      <div class="section-head">
-        <span class="msym">psychology</span>
-        Modèle IA
-      </div>
+      <div class="section-head"><span class="msym">psychology</span>Moteur &amp; gamme</div>
       <div class="section-body">
         <div class="two-col">
           <div class="field">
-            <span class="field-label">Modèle actif</span>
-            <select class="field-select" id="model-select" disabled>
-              <option value="deepseek">DeepSeek R1 Llama 8B</option>
-              <option value="kimi">Kimi K2 Instruct</option>
-            </select>
-            <span class="jb" style="font-size:10px;color:var(--txt-dim);margin-top:4px" id="model-status">Chargement...</span>
+            <span class="field-label">Moteur actif</span>
+            <select class="field-select" id="engine-select" onchange="switchEngine(this.value)"></select>
+            <span class="jb" style="font-size:10px;margin-top:4px" id="engine-status">Chargement…</span>
           </div>
           <div class="field">
-            <span class="field-label">Accélération GPU</span>
-            <div class="gpu-widget">
-              <div class="gpu-top">
-                <div>
-                  <div class="gpu-name">GTX 1650</div>
-                  <div class="gpu-sub">4 GB VRAM · Vulkan</div>
-                </div>
-                <div class="gpu-status">
-                  <div class="gpu-dot" id="gpu-dot"></div>
-                  <span id="gpu-status-txt">Actif</span>
-                </div>
-              </div>
-              <div class="gpu-bar-track">
-                <div class="gpu-bar-fill" id="gpu-bar"></div>
-              </div>
-              <div class="jb" style="font-size:10px;color:var(--txt-dim);margin-top:6px" id="gpu-detail">16 couches GPU · llama-cpp Vulkan</div>
-            </div>
+            <span class="field-label">Gamme (mode de réponse)</span>
+            <select class="field-select" id="mode-select" onchange="switchMode(this.value)"></select>
+            <span class="jb" style="font-size:10px;color:var(--txt-dim);margin-top:4px" id="mode-desc"></span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Section : Statistiques -->
+    <!-- Statistiques -->
     <div class="section">
-      <div class="section-head">
-        <span class="msym">bar_chart</span>
-        Statistiques de session
-      </div>
+      <div class="section-head"><span class="msym">bar_chart</span>Statistiques</div>
       <div class="section-body">
         <div class="stats-row">
-          <div class="stat-card">
-            <p class="stat-value" id="stat-session">0</p>
-            <p class="stat-label">Messages (session)</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-value" id="stat-total">0</p>
-            <p class="stat-label">Messages (total)</p>
-          </div>
-          <div class="stat-card">
-            <p class="stat-value" id="stat-appren">0</p>
-            <p class="stat-label">Apprentissages</p>
-          </div>
+          <div class="stat-card"><p class="stat-value" id="stat-session">0</p><p class="stat-label">Messages (session)</p></div>
+          <div class="stat-card"><p class="stat-value" id="stat-total">0</p><p class="stat-label">Messages (total)</p></div>
+          <div class="stat-card"><p class="stat-value" id="stat-faits">0</p><p class="stat-label">Faits mémorisés</p></div>
+          <div class="stat-card"><p class="stat-value" id="stat-appren">0</p><p class="stat-label">Apprentissages</p></div>
         </div>
       </div>
     </div>
 
-    <!-- Section : Mémoire & historique -->
+    <!-- Mémoire active -->
     <div class="section">
-      <div class="section-head">
-        <span class="msym">database</span>
-        Mémoire &amp; historique
-      </div>
+      <div class="section-head"><span class="msym">database</span>Mémoire active</div>
       <div class="section-body">
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <p class="toggle-title">Sauvegarder l'historique</p>
-            <p class="toggle-desc">Conserve les échanges localement entre les sessions.</p>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" checked/>
-            <div class="toggle-track"></div>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <p class="toggle-title">Mémoire contextuelle continue</p>
-            <p class="toggle-desc">Le modèle se souvient du contexte des sessions précédentes. (Expérimental)</p>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox"/>
-            <div class="toggle-track"></div>
-          </label>
+        <p style="font-size:13px;color:var(--txt-dim);margin:0">Tout ce que UNION IA a retenu sur toi. Tu peux ajouter, modifier ou oublier chaque élément.</p>
+        <div class="fact-list" id="fact-list"></div>
+        <div class="add-fact-row">
+          <input class="field-input" id="fact-input" placeholder="Ajouter un fait (ex : Préfère les réponses courtes)"/>
+          <button class="btn" onclick="addFact()"><span class="msym" style="font-size:16px">add</span>Ajouter</button>
         </div>
         <div style="margin-top:4px;">
           <button class="btn-danger" onclick="purgerMemoire()">
-            <span class="msym" style="font-size:15px">delete_forever</span>
-            Purger la mémoire
+            <span class="msym" style="font-size:15px">delete_forever</span>Oublier toute la mémoire
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Section : Apparence & Langue -->
+    <!-- Apparence -->
     <div class="section">
-      <div class="section-head">
-        <span class="msym">palette</span>
-        Apparence &amp; Langue
-      </div>
+      <div class="section-head"><span class="msym">palette</span>Apparence &amp; profil</div>
       <div class="section-body">
-        <div class="two-col">
-          <div class="field">
-            <span class="field-label">Thème</span>
-            <div class="readonly-field">
-              <span class="msym" style="font-size:18px;color:var(--cyan)">dark_mode</span>
-              Mode sombre (verrouillé)
-            </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <p class="toggle-title">Thème clair</p>
+            <p class="toggle-desc">Bascule entre le mode sombre et le mode clair.</p>
           </div>
-          <div class="field">
-            <span class="field-label">Langue de l'interface</span>
-            <select class="field-select">
-              <option value="fr" selected>Français (FR)</option>
-              <option value="en">English (US)</option>
-            </select>
+          <label class="toggle-switch">
+            <input type="checkbox" id="theme-toggle" onchange="onThemeToggle(this.checked)"/>
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+        <div class="field" style="margin-top:8px">
+          <span class="field-label">Ton prénom</span>
+          <div class="add-fact-row">
+            <input class="field-input" id="name-input" placeholder="Ton prénom"/>
+            <button class="btn" onclick="saveName()"><span class="msym" style="font-size:16px">check</span>Enregistrer</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Section : À propos -->
+    <!-- À propos -->
     <div class="section">
       <div class="section-head" style="justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="msym">info</span>
-          À propos
-        </div>
-        <span class="version-badge" id="version-badge">v1.0.0</span>
+        <div style="display:flex;align-items:center;gap:8px;"><span class="msym">info</span>À propos</div>
+        <span class="version-badge" id="version-badge">v2.1.0</span>
       </div>
       <div class="section-body">
         <div class="about-card">
           <div>
             <p class="about-name">UNION IA</p>
-            <p class="about-desc">Intelligence artificielle personnelle — 100% locale.</p>
+            <p class="about-desc">Assistant IA personnel — gamme 2.1.</p>
           </div>
           <div class="about-right">
             <p class="about-by">Développé par</p>
@@ -525,74 +435,195 @@ main {
         </div>
       </div>
     </div>
-
   </main>
 </div>
 
 <script>
+// ── Thème ──────────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = theme === 'light' ? 'dark_mode' : 'light_mode';
+  const tg = document.getElementById('theme-toggle');
+  if (tg) tg.checked = theme === 'light';
+  localStorage.setItem('union-theme', theme);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyTheme(cur === 'light' ? 'dark' : 'light');
+}
+function onThemeToggle(on) { applyTheme(on ? 'light' : 'dark'); }
+applyTheme(localStorage.getItem('union-theme') || 'dark');
+
+// ── Statut & moteur ────────────────────────────────────────────────────────────
+const ENGINE_LABELS = {
+  'deepseek-api': 'DeepSeek (API Cloud)',
+  'gemini-api':   'Gemini (API Cloud)',
+  'deepseek-local': 'DeepSeek (local)',
+  'kimi-local':   'Kimi K2 (local)',
+};
+const MODE_DESCS = {
+  '2.1': 'Raisonnement complet, qualité maximale',
+  'flash': 'Rapide et concis, pour le quotidien',
+  'flashlight': 'Ultra-rapide, réponses très courtes',
+};
+
 async function loadStatus() {
   try {
-    const r = await fetch('/api/status');
-    const d = await r.json();
-
-    // User
+    const d = await (await fetch('/api/status')).json();
     if (d.utilisateur) {
       document.getElementById('nav-name').textContent = d.utilisateur;
       document.getElementById('nav-initial').textContent = d.utilisateur[0].toUpperCase();
       document.getElementById('about-dev').textContent = d.utilisateur;
+      document.getElementById('name-input').value = d.utilisateur;
     }
-
-    // Model
-    const sel = document.getElementById('model-select');
-    if (d.modele_id === 'kimi') sel.value = 'kimi';
-    else sel.value = 'deepseek';
-
-    const statusEl = document.getElementById('model-status');
+    const st = document.getElementById('engine-status');
     if (d.llm_actif) {
-      statusEl.textContent = `✓ ${d.modele} chargé — ${d.echanges_llm} échanges cette session`;
-      statusEl.style.color = 'var(--ok)';
+      st.textContent = '✓ ' + d.modele + ' actif';
+      st.style.color = 'var(--ok)';
     } else {
-      statusEl.textContent = '✗ LLM non disponible — mode réseau neuronal';
-      statusEl.style.color = 'var(--err)';
-      document.getElementById('gpu-dot').style.background = 'var(--err)';
-      document.getElementById('gpu-dot').style.animation = 'none';
-      document.getElementById('gpu-status-txt').textContent = 'Inactif';
-      document.getElementById('gpu-status-txt').style.color = 'var(--err)';
+      st.textContent = '✗ Aucun moteur — configure une clé API dans .env';
+      st.style.color = 'var(--err)';
     }
-
-    // GPU bar: 16 layers out of ~33 total for this model ≈ 48%
-    if (d.llm_actif) {
-      const pct = Math.round((d.gpu_couches / 33) * 100);
-      document.getElementById('gpu-bar').style.width = pct + '%';
-      document.getElementById('gpu-detail').textContent = `${d.gpu_couches} couches GPU · llama-cpp Vulkan`;
-    }
-
-    // Stats
     document.getElementById('stat-session').textContent = d.messages_session ?? 0;
     document.getElementById('stat-total').textContent = (d.total_messages ?? 0) + (d.messages_session ?? 0);
+    document.getElementById('stat-faits').textContent = d.faits ?? 0;
     document.getElementById('stat-appren').textContent = d.apprentissages ?? 0;
-
-    // Version
-    document.getElementById('version-badge').textContent = 'v' + d.version;
-
+    document.getElementById('version-badge').textContent = 'v' + (d.version || '2.1.0');
   } catch {
-    document.getElementById('model-status').textContent = 'Serveur hors ligne';
-    document.getElementById('model-status').style.color = 'var(--err)';
+    document.getElementById('engine-status').textContent = 'Serveur hors ligne';
+    document.getElementById('engine-status').style.color = 'var(--err)';
   }
+}
+
+async function loadEngines() {
+  try {
+    const d = await (await fetch('/api/modeles')).json();
+    const sel = document.getElementById('engine-select');
+    sel.innerHTML = '';
+    let any = false;
+    for (const [id, dispo] of Object.entries(d.disponibles)) {
+      if (!dispo) continue;
+      any = true;
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = ENGINE_LABELS[id] || id;
+      if (id === d.actif) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    if (!any) {
+      const opt = document.createElement('option');
+      opt.textContent = 'Aucun moteur disponible';
+      sel.appendChild(opt);
+      sel.disabled = true;
+    }
+  } catch {}
+}
+
+async function loadModes() {
+  try {
+    const d = await (await fetch('/api/modes')).json();
+    const sel = document.getElementById('mode-select');
+    sel.innerHTML = '';
+    for (const m of d.modes) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.label;
+      if (m.id === d.actif) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    document.getElementById('mode-desc').textContent = MODE_DESCS[d.actif] || '';
+  } catch {}
+}
+
+async function switchEngine(id) {
+  const st = document.getElementById('engine-status');
+  st.textContent = 'Changement…'; st.style.color = 'var(--txt-dim)';
+  try {
+    const d = await (await fetch('/api/modele', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modele: id }),
+    })).json();
+    if (d.success) { st.textContent = '✓ ' + d.message; st.style.color = 'var(--ok)'; }
+    else { st.textContent = '✗ ' + d.error; st.style.color = 'var(--err)'; }
+  } catch { st.textContent = 'Erreur'; st.style.color = 'var(--err)'; }
+}
+
+async function switchMode(id) {
+  document.getElementById('mode-desc').textContent = MODE_DESCS[id] || '';
+  try {
+    await fetch('/api/mode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: id }),
+    });
+  } catch {}
+}
+
+// ── Mémoire active ─────────────────────────────────────────────────────────────
+async function loadMemory() {
+  try {
+    const d = await (await fetch('/api/memory')).json();
+    const list = document.getElementById('fact-list');
+    list.innerHTML = '';
+    const faits = d.faits || [];
+    if (!faits.length) {
+      list.innerHTML = '<div class="fact-empty">Aucun souvenir pour l\'instant. Parle à UNION IA, il retiendra l\'essentiel.</div>';
+      return;
+    }
+    for (const f of faits) {
+      const div = document.createElement('div');
+      div.className = 'fact';
+      div.innerHTML = `<span class="fact-cat">${esc(f.categorie || 'général')}</span>
+        <span class="fact-val">${esc(f.valeur)}</span>
+        <button class="fact-del" title="Oublier"><span class="msym" style="font-size:16px">close</span></button>`;
+      div.querySelector('.fact-del').onclick = () => forgetFact(f.cle);
+      list.appendChild(div);
+    }
+  } catch {}
+}
+
+async function addFact() {
+  const inp = document.getElementById('fact-input');
+  const val = inp.value.trim();
+  if (!val) return;
+  const cle = 'manuel_' + Date.now();
+  await fetch('/api/memory', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cle, valeur: val, categorie: 'manuel' }),
+  });
+  inp.value = '';
+  loadMemory(); loadStatus();
+}
+
+async function forgetFact(cle) {
+  await fetch('/api/memory/' + encodeURIComponent(cle), { method: 'DELETE' });
+  loadMemory(); loadStatus();
 }
 
 async function purgerMemoire() {
-  if (!confirm('Effacer tout l\'historique de conversation ? Cette action est irréversible.')) return;
-  try {
-    await fetch('/api/history', { method: 'DELETE' });
-    document.getElementById('stat-session').textContent = '0';
-    alert('Mémoire purgée avec succès.');
-  } catch {
-    alert('Erreur lors de la purge. Le serveur est-il actif ?');
-  }
+  if (!confirm('Oublier tout ce que UNION IA a mémorisé sur toi ? Action irréversible.')) return;
+  await fetch('/api/memory', { method: 'DELETE' });
+  loadMemory(); loadStatus();
+}
+
+async function saveName() {
+  const nom = document.getElementById('name-input').value.trim();
+  if (!nom) return;
+  await fetch('/api/profil', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nom }),
+  });
+  loadStatus();
+}
+
+function esc(t) {
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 loadStatus();
+loadEngines();
+loadModes();
+loadMemory();
 </script>
 </body>
 </html>
