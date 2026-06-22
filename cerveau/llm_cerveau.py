@@ -57,9 +57,16 @@ class _BackendDeepSeek:
     MODELE = "deepseek-chat"
 
     def __init__(self, api_key: str):
-        from openai import OpenAI
-        self._client = OpenAI(api_key=api_key, base_url=self.ENDPOINT)
+        # Import différé — ne bloque pas le démarrage
+        self._api_key = api_key
+        self._client = None
         self._modele = self.MODELE
+
+    def _get_client(self):
+        if self._client is None:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=self._api_key, base_url=self.ENDPOINT)
+        return self._client
 
     def _messages(self, message: str, historique: list, nom: str | None) -> list:
         sys = _lire_system_prompt()
@@ -74,7 +81,7 @@ class _BackendDeepSeek:
 
     def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
         try:
-            res = self._client.chat.completions.create(
+            res = self._get_client().chat.completions.create(
                 model=self._modele,
                 messages=self._messages(message, historique, nom),
                 max_tokens=2048,
@@ -88,7 +95,7 @@ class _BackendDeepSeek:
 
     def repondre_stream(self, message: str, historique: list, nom: str | None = None):
         try:
-            stream = self._client.chat.completions.create(
+            stream = self._get_client().chat.completions.create(
                 model=self._modele,
                 messages=self._messages(message, historique, nom),
                 max_tokens=2048,
@@ -153,13 +160,7 @@ class _BackendGemini:
     MODELE = "gemini-2.0-flash"
 
     def __init__(self, api_key: str):
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        sys_prompt = _lire_system_prompt()
-        self._model = genai.GenerativeModel(
-            model_name=self.MODELE,
-            system_instruction=sys_prompt,
-        )
+        # Import différé — ne bloque pas le démarrage
         self._api_key = api_key
 
     def _construire_historique_gemini(self, historique: list) -> list:
@@ -169,16 +170,17 @@ class _BackendGemini:
             msgs.append({"role": "model", "parts": [h["assistant"]]})
         return msgs
 
+    def _get_model(self, nom: str | None = None):
+        import google.generativeai as genai
+        genai.configure(api_key=self._api_key)
+        sys_prompt = _lire_system_prompt()
+        if nom:
+            sys_prompt += f"\n\nL'utilisateur s'appelle {nom}."
+        return genai.GenerativeModel(model_name=self.MODELE, system_instruction=sys_prompt)
+
     def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
         try:
-            import google.generativeai as genai
-            sys_prompt = _lire_system_prompt()
-            if nom:
-                sys_prompt += f"\n\nL'utilisateur s'appelle {nom}."
-            model = genai.GenerativeModel(
-                model_name=self.MODELE,
-                system_instruction=sys_prompt,
-            )
+            model = self._get_model(nom)
             chat = model.start_chat(history=self._construire_historique_gemini(historique))
             res = chat.send_message(message)
             return res.text.strip() or None
@@ -187,14 +189,7 @@ class _BackendGemini:
 
     def repondre_stream(self, message: str, historique: list, nom: str | None = None):
         try:
-            import google.generativeai as genai
-            sys_prompt = _lire_system_prompt()
-            if nom:
-                sys_prompt += f"\n\nL'utilisateur s'appelle {nom}."
-            model = genai.GenerativeModel(
-                model_name=self.MODELE,
-                system_instruction=sys_prompt,
-            )
+            model = self._get_model(nom)
             chat = model.start_chat(history=self._construire_historique_gemini(historique))
             stream = chat.send_message(message, stream=True)
             reponse_complete = ""
@@ -217,16 +212,23 @@ class _BackendLocal:
     ID = "local"
 
     def __init__(self, chemin: Path, nom_modele: str):
-        from llama_cpp import Llama
-        self._llm = Llama(
-            model_path=str(chemin),
-            n_ctx=4096,
-            n_gpu_layers=16,
-            n_threads=8,
-            verbose=False,
-            chat_format="chatml",
-        )
+        # Import différé — le chargement GGUF est lourd, on attend le premier message
+        self._chemin = chemin
         self._nom = nom_modele
+        self._llm = None
+
+    def _get_llm(self):
+        if self._llm is None:
+            from llama_cpp import Llama
+            self._llm = Llama(
+                model_path=str(self._chemin),
+                n_ctx=4096,
+                n_gpu_layers=16,
+                n_threads=8,
+                verbose=False,
+                chat_format="chatml",
+            )
+        return self._llm
 
     def _messages(self, message: str, historique: list, nom: str | None) -> list:
         sys = _lire_system_prompt()
@@ -241,7 +243,7 @@ class _BackendLocal:
 
     def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
         try:
-            res = self._llm.create_chat_completion(
+            res = self._get_llm().create_chat_completion(
                 messages=self._messages(message, historique, nom),
                 max_tokens=2048,
                 temperature=0.75,
@@ -257,7 +259,7 @@ class _BackendLocal:
 
     def repondre_stream(self, message: str, historique: list, nom: str | None = None):
         try:
-            stream = self._llm.create_chat_completion(
+            stream = self._get_llm().create_chat_completion(
                 messages=self._messages(message, historique, nom),
                 max_tokens=2048,
                 temperature=0.75,
@@ -335,44 +337,33 @@ class LLMCerveau:
         self._auto_charger()
 
     def _auto_charger(self):
-        """Tente de charger automatiquement le meilleur backend disponible."""
+        """Sélectionne le meilleur backend disponible — sans aucun import réseau.
+        Les librairies sont importées paresseusement au premier message."""
+
         # 1. DeepSeek API
         cle_ds = os.environ.get("DEEPSEEK_API_KEY", "")
         if cle_ds and not cle_ds.startswith("sk-REMPLACE"):
-            try:
-                self._backend = _BackendDeepSeek(cle_ds)
-                self.modele_actif = "deepseek-api"
-                return
-            except Exception:
-                pass
+            self._backend = _BackendDeepSeek(cle_ds)
+            self.modele_actif = "deepseek-api"
+            return
 
         # 2. Gemini API
         cle_gem = os.environ.get("GEMINI_API_KEY", "")
         if cle_gem and not cle_gem.startswith("AIzaSy_REMPLACE"):
-            try:
-                self._backend = _BackendGemini(cle_gem)
-                self.modele_actif = "gemini-api"
-                return
-            except Exception:
-                pass
+            self._backend = _BackendGemini(cle_gem)
+            self.modele_actif = "gemini-api"
+            return
 
         # 3. Modèle local DeepSeek
         if _MODELE_DEEPSEEK_LOCAL.exists():
-            try:
-                self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
-                self.modele_actif = "deepseek-local"
-                return
-            except Exception:
-                pass
+            self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
+            self.modele_actif = "deepseek-local"
+            return
 
         # 4. Modèle local Kimi
         if _MODELE_KIMI_LOCAL.exists():
-            try:
-                self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
-                self.modele_actif = "kimi-local"
-                return
-            except Exception:
-                pass
+            self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
+            self.modele_actif = "kimi-local"
 
     def charger(self, modele: str = "deepseek") -> tuple[bool, str]:
         """Charge manuellement un backend spécifique (commande /modele)."""
