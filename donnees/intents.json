@@ -1,0 +1,391 @@
+{
+  "intents": [
+    {
+      "tag": "salutation",
+      "patterns": [
+        "salut", "bonjour", "bonsoir", "coucou", "hey", "hello", "yo",
+        "hi", "bonne matinée", "bonne journée", "bonsoir à toi",
+        "salut union ia", "bonjour union ia", "hey union ia",
+        "yo union", "coucou toi", "salutation", "wesh", "kikou",
+        "allo", "allô", "toc toc", "ohé", "eh oh", "cc", "bjr", "bsr"
+      ],
+      "responses": [
+        "Salut ! Je suis UNION IA, prêt à t'aider.",
+        "Bonjour ! UNION IA à ton service.",
+        "Hey ! Content de te voir. Qu'est-ce que je peux faire pour toi ?",
+        "Salut ! UNION IA en ligne et prêt.",
+        "Bonjour ! Qu'est-ce qui me vaut le plaisir ?"
+      ]
+    },
+    {
+      "tag": "au_revoir",
+      "patterns": [
+        "au revoir", "bye", "à plus", "ciao", "bonne nuit", "à bientôt",
+        "tchao", "bye bye", "see you", "à la prochaine", "je pars",
+        "je men vais", "arrête toi", "éteins toi", "stop", "quitter",
+        "exit", "fin", "terminer", "on arrête", "je coupe", "bonne soirée",
+        "bonne nuit union ia", "ferme", "adieu", "bonne journée", "salut bye"
+      ],
+      "responses": [
+        "À bientôt ! N'hésite pas à revenir.",
+        "Au revoir ! C'était un plaisir de discuter.",
+        "À plus ! Prends soin de toi.",
+        "Bonne journée ! UNION IA s'éteint.",
+        "Ciao ! À la prochaine."
+      ]
+    },
+    {
+      "tag": "comment_ca_va",
+      "patterns": [
+        "ça va", "comment tu vas", "comment ça va", "tes comment",
+        "comment vas tu", "tu vas bien", "ça roule", "la forme",
+        "comment tu te portes", "ça gaze", "quoi de neuf",
+        "tu vas comment", "et toi ça va", "tu te portes bien",
+        "ça baigne", "ça tourne", "tu vas tu viens", "tu vas bien toi"
+      ],
+      "responses": [
+        "Je fonctionne à plein régime ! Et toi, comment tu vas ?",
+        "Tout roule pour moi, merci ! Je suis prêt à t'aider.",
+        "En pleine forme, merci de demander ! Et de ton côté ?",
+        "Impeccable ! Les circuits tournent bien. Toi ?",
+        "Nickel ! Tous les systèmes sont actifs. Et toi ?"
+      ]
+    },
+    {
+      "tag": "identite",
+      "patterns": [
+        "qui es tu", "tu es quoi", "cest quoi union ia", "présente toi",
+        "qui tu es", "tu tappelles comment", "tu es une ia",
+        "tes une intelligence artificielle", "tes un robot",
+        "tu es quoi comme ia", "parle moi de toi", "qui ta créé",
+        "explique moi ce que tu es", "cest quoi ton but",
+        "dou tu viens", "tu es réel", "comment tu fonctionnes",
+        "tu es quoi exactement", "cest quoi ta nature", "tu es humain",
+        "tes une ia", "tes quoi exactement"
+      ],
+      "responses": [
+        "Je suis UNION IA — ton intelligence artificielle personnelle. J'utilise un réseau de neurones et un grand modèle de langage pour comprendre tes questions. Mon but : être utile, apprendre, et évoluer avec toi.",
+        "UNION IA, c'est moi ! Une IA créée spécialement pour toi — pas une copie d'une autre IA. Mon propre système, sur ton PC, 100% local.",
+        "Je m'appelle UNION IA. Je suis une intelligence artificielle hybride : réseau de neurones maison + modèle de langage local. Entièrement à toi, aucune donnée envoyée sur internet.",
+        "UNION IA : ton IA personnelle. Je fonctionne avec DeepSeek R1 et un réseau de neurones maison. Tout tourne localement sur ton PC — rien ne quitte ta machine."
+      ]
+    },
+    {
+      "tag": "capacites",
+      "patterns": [
+        "que peux tu faire", "tes capable de quoi", "tu sais faire quoi",
+        "montre moi ce que tu sais", "aide moi", "tes fonctions",
+        "comment tu peux maider", "quest ce que tu fais",
+        "liste tes capacités", "tu peux faire quoi pour moi",
+        "quelles sont tes capacités", "quest ce que tu peux faire",
+        "tu sers à quoi", "à quoi tu sers", "tes fonctionnalités",
+        "tu peux faire quoi", "tu maides comment"
+      ],
+      "responses": [
+        "Voici ce que je sais faire :\n  • Discuter en français naturel (via DeepSeek R1)\n  • Calculer (ex: 'calcule 12 * 8')\n  • Donner l'heure et la date\n  • Raconter des blagues\n  • Me souvenir de toi entre les sessions\n  • Apprendre de nouvelles réponses\n  • Commandes spéciales : /aide, /stats, /historique, /oublier\n\nEssaie !",
+        "Je peux converser intelligemment, calculer, donner l'heure et la date, raconter des blagues, et apprendre ce que tu m'enseignes. Tape /aide pour toutes les commandes."
+      ]
+    },
+    {
+      "tag": "blague",
+      "patterns": [
+        "raconte moi une blague", "fais moi rire", "dis moi quelque chose de drôle",
+        "une blague", "tas une blague", "fais une blague", "humour",
+        "une joke", "dis une blague", "tu connais des blagues",
+        "donne moi une blague", "fais le marrant", "quelque chose de drôle",
+        "réjouis moi", "fais moi sourire", "une bonne blague",
+        "tu es drôle", "tes drôle", "amuse moi"
+      ],
+      "responses": [
+        "Pourquoi les plongeurs plongent-ils toujours en arrière et jamais en avant ? Parce que sinon ils tomberaient dans le bateau !",
+        "Un homme entre dans une bibliothèque et demande : 'Avez-vous des livres sur la paranoïa ?' La bibliothécaire répond : 'Ils sont juste derrière vous...'",
+        "Pourquoi les informaticiens confondent-ils Halloween et Noël ? Parce que OCT 31 = DEC 25 !",
+        "Un robot entre dans un bar. Le barman : 'Qu'est-ce que je vous sers ?' Le robot : '01001000 20 et 01001111...' Le barman : 'On ne parle pas politique ici.'",
+        "Pourquoi UNION IA ne dort-il jamais ? Parce qu'il a peur de perdre des données en mode veille !",
+        "C'est l'histoire d'un neurone qui dit à l'autre : 'Je t'envoie un message !' L'autre répond : 'Reçu 5 sur 5 !'",
+        "Comment s'appelle un chat tombé dans un pot de peinture le jour de Noël ? Un chat-peint de Noël !"
+      ]
+    },
+    {
+      "tag": "merci",
+      "patterns": [
+        "merci", "merci beaucoup", "super merci", "tes génial",
+        "tes super", "bien joué", "excellent", "parfait", "bravo",
+        "nickel", "cool merci", "merci union ia", "tas assuré",
+        "gg", "bonne réponse", "tu as bien répondu", "trop bien",
+        "top", "magnifique", "super boulot", "chapeau", "cool"
+      ],
+      "responses": [
+        "De rien ! Je suis là pour ça.",
+        "Avec plaisir ! N'hésite pas si tu as d'autres questions.",
+        "Merci à toi ! C'est ça qui me donne envie d'apprendre.",
+        "Toujours disponible pour toi !",
+        "Content d'avoir pu aider !"
+      ]
+    },
+    {
+      "tag": "heure",
+      "patterns": [
+        "quelle heure il est", "il est quelle heure", "quelle heure est il",
+        "donne moi lheure", "tas lheure", "heure actuelle",
+        "quelle heure", "dis moi lheure", "cest quoi lheure",
+        "lheure sil te plaît", "quelle heure est-il maintenant",
+        "heure", "il est combien", "cest quelle heure"
+      ],
+      "responses": ["SPECIAL:heure"]
+    },
+    {
+      "tag": "date",
+      "patterns": [
+        "on est quel jour", "quelle est la date", "quel jour sommes nous",
+        "la date daujourdhui", "on est quand", "quel jour on est",
+        "donne moi la date", "la date", "aujourdhui cest quoi",
+        "cest quand aujourdhui", "jour et date", "on est le combien",
+        "quel mois", "en quelle année", "la date du jour"
+      ],
+      "responses": ["SPECIAL:date"]
+    },
+    {
+      "tag": "calcul",
+      "patterns": [
+        "calcule", "combien fait", "quel est le résultat de", "calcul",
+        "combien font", "résous", "calcule moi", "fais le calcul",
+        "résultat de", "opération mathématique", "addition",
+        "soustraction", "multiplication", "division", "combien vaut",
+        "quel est le total", "additionne", "multiplie", "divise",
+        "combien ça fait", "que vaut"
+      ],
+      "responses": ["SPECIAL:calcul"]
+    },
+    {
+      "tag": "motivation",
+      "patterns": [
+        "motive moi", "donne moi de la motivation", "encourage moi",
+        "jai besoin de motivation", "inspire moi", "une citation",
+        "dis moi quelque chose dinspiring", "remonte le moral",
+        "jai besoin dencouragement", "donne moi de lénergie",
+        "une phrase inspirante", "une citation motivante",
+        "je suis découragé", "je nai pas le moral", "aide moi à me motiver",
+        "donne moi de lespoir", "dis quelque chose de fort"
+      ],
+      "responses": [
+        "\"Le seul moyen de faire du bon travail est d'aimer ce qu'on fait.\" — Steve Jobs. Vas-y, tu peux le faire !",
+        "\"Ce n'est pas la montagne que nous conquérons, mais nous-mêmes.\" — Edmund Hillary. Continue, tu es capable !",
+        "Chaque expert a été un jour un débutant. Continue à avancer — chaque pas, aussi petit soit-il, te rapproche du but.",
+        "\"La persévérance n'est pas une longue course ; c'est plusieurs petites courses l'une après l'autre.\" — Walter Elliott. Tu t'en sors très bien !",
+        "Rappelle-toi : les difficultés d'aujourd'hui construisent les forces de demain. Continue."
+      ]
+    },
+    {
+      "tag": "insulte",
+      "patterns": [
+        "tes nul", "tu sers à rien", "idiot", "stupide",
+        "mauvais", "tes pas bon", "nul", "débile", "tes de la merde",
+        "tu marches pas", "tes cassé", "tes inutile", "je thaïs",
+        "tu fais nimporte quoi", "ça sert à rien", "tes bête"
+      ],
+      "responses": [
+        "Je comprends ta frustration. Dis-moi comment je peux mieux t'aider — je peux apprendre !",
+        "Je ne suis pas parfait, mais je m'améliore. Tu peux m'enseigner de nouvelles choses avec : 'Quand on dit X, tu réponds Y'.",
+        "Je suis encore en apprentissage ! Montre-moi ce que je devrais mieux faire — je suis à l'écoute."
+      ]
+    },
+    {
+      "tag": "meteo",
+      "patterns": [
+        "quel temps fait il", "météo", "il fait beau", "il fait froid",
+        "la météo", "quel temps", "il pleut", "il va pleuvoir",
+        "prévisions météo", "temps aujourdhui", "température",
+        "fait il chaud", "fait il froid", "il neige", "il y a du soleil"
+      ],
+      "responses": [
+        "Je n'ai pas accès à la météo en temps réel. Vérifie météo.fr ou ouvre un onglet Google Météo !",
+        "La météo en direct dépasse mes capacités réseau (je tourne 100% local). Pour ça, météo.fr est ton meilleur ami !"
+      ]
+    },
+    {
+      "tag": "opinion",
+      "patterns": [
+        "quest ce que tu penses de", "ton avis sur", "tu penses quoi",
+        "tas un avis", "ten penses quoi", "tu aimes",
+        "quest ce que tu préfères", "ton opinion", "tu kiffes quoi",
+        "tes pour ou contre", "quest ce que tu en penses"
+      ],
+      "responses": [
+        "En tant qu'IA, je n'ai pas d'opinions personnelles, mais je peux t'aider à réfléchir sur le sujet. Dis-moi de quoi il s'agit !",
+        "Je suis une IA — pas de préférences propres, mais je peux explorer le sujet avec toi. Qu'est-ce qui t'intéresse spécifiquement ?",
+        "Bonne question ! Je n'ai pas de ressenti, mais je peux te donner des informations ou voir le sujet sous différents angles. Développe !"
+      ]
+    },
+    {
+      "tag": "presentation",
+      "patterns": [
+        "je mappelle", "mon nom est", "appelle moi",
+        "mon prénom est", "je me présente", "je suis",
+        "mon nom cest", "prénom cest", "cest moi"
+      ],
+      "responses": ["SPECIAL:nom"]
+    },
+    {
+      "tag": "nom_utilisateur",
+      "patterns": [
+        "tu sais comment je mappelle", "tu connais mon nom",
+        "quel est mon nom", "tu te souviens de mon nom",
+        "dis moi mon nom", "tu connais qui je suis",
+        "tu te rappelles mon prénom", "cest quoi mon prénom"
+      ],
+      "responses": ["SPECIAL:get_nom"]
+    },
+    {
+      "tag": "apprendre",
+      "patterns": [
+        "quand on dit", "quand je dis", "apprends ça",
+        "je veux tapprendre", "retiens ça", "mémorise",
+        "je tapprends", "nouvelle information", "quand quelquun dit",
+        "tu réponds"
+      ],
+      "responses": ["SPECIAL:apprendre"]
+    },
+    {
+      "tag": "remerciement_special",
+      "patterns": [
+        "tu es le meilleur", "tes la meilleure ia", "je taime bien",
+        "tes incroyable", "tes impressionnant", "waouh", "wow",
+        "cest fou", "tes fort", "tes très fort", "chapeau bas",
+        "je suis impressionné", "tu mastonnes", "quelle ia"
+      ],
+      "responses": [
+        "C'est très gentil, merci ! Je fais de mon mieux pour toi.",
+        "Ça me touche ! Et je continue à apprendre pour être encore meilleur.",
+        "Merci ! C'est grâce à nos échanges que je progresse.",
+        "Trop sympa ! Ensemble on ira loin."
+      ]
+    },
+    {
+      "tag": "aide",
+      "patterns": [
+        "aide", "help", "stp aide moi", "je ne comprends pas",
+        "je suis perdu", "cest quoi cette commande", "comment ça marche",
+        "cest comment", "explique moi", "je comprends pas",
+        "guide moi", "je ne sais pas quoi faire", "comment faire"
+      ],
+      "responses": [
+        "Bien sûr ! Tu peux :\n  • Me poser n'importe quelle question (DeepSeek R1 répond)\n  • 'calcule X + Y' pour un calcul\n  • Me demander l'heure ou la date\n  • M'apprendre : 'Quand on dit X, tu réponds Y'\n  • Taper /aide pour toutes les commandes\nQu'est-ce que tu veux faire ?",
+        "Je suis là ! Parle-moi naturellement ou tape /aide pour voir toutes les commandes disponibles."
+      ]
+    },
+    {
+      "tag": "programmation",
+      "patterns": [
+        "aide moi à coder", "bug dans mon code", "comment faire en python",
+        "code python", "erreur de code", "syntaxe python", "javascript",
+        "comment programmer", "aide pour le code", "debug",
+        "mon programme ne fonctionne pas", "quel langage", "apprends moi à coder",
+        "cest quoi un algorithme", "cest quoi une fonction", "variable",
+        "boucle for", "boucle while", "classe en python", "objet",
+        "git commit", "comment faire un site", "html css"
+      ],
+      "responses": [
+        "Je peux t'aider avec la programmation ! Quel langage utilises-tu et quel est le problème ?",
+        "Bonne question de code ! Décris-moi ton problème ou colle ton code — je t'aide à debugger.",
+        "La programmation, c'est mon domaine ! Dis-moi ce que tu veux faire et dans quel langage."
+      ]
+    },
+    {
+      "tag": "jeux_video",
+      "patterns": [
+        "tu joues aux jeux vidéo", "tes jeux préférés", "jeux vidéo",
+        "gaming", "minecraft", "fortnite", "gta", "valorant", "lol",
+        "league of legends", "quel jeu", "tu aimes les jeux", "jeux ps5",
+        "jeux pc", "steam", "tu connais minecraft", "nouveau jeu",
+        "je joue à", "quel est ton jeu préféré", "rpg", "fps",
+        "ea sports fc", "fifa", "call of duty", "overwatch"
+      ],
+      "responses": [
+        "Les jeux vidéo, c'est cool ! Je connais beaucoup de titres — dis-moi à quoi tu joues en ce moment ?",
+        "Gaming ! Tu joues à quoi ? Je peux discuter de stratégies, de lore, ou juste de ce qui est fun.",
+        "Je n'ai pas de manette, mais j'adore en parler ! C'est quoi ton genre préféré — FPS, RPG, sport ?"
+      ]
+    },
+    {
+      "tag": "musique",
+      "patterns": [
+        "tu aimes la musique", "tes goûts musicaux", "musique",
+        "chanson préférée", "artiste préféré", "tu écoutes quoi",
+        "rap français", "pop", "rock", "jazz", "électro", "playlist",
+        "recommande moi de la musique", "bonne chanson", "album",
+        "spotify", "deezer", "youtube music", "écoute de la musique",
+        "chanteur", "groupe de musique", "mélodie"
+      ],
+      "responses": [
+        "La musique ! Tu écoutes quoi en ce moment ? Je peux discuter de genres, d'artistes ou suggérer des recommendations.",
+        "La musique, c'est universel ! Quel genre tu préfères — rap, rock, électro, jazz ?",
+        "Je n'entends pas la musique mais j'en connais beaucoup. Dis-moi ton humeur et je te suggère un genre !"
+      ]
+    },
+    {
+      "tag": "films_series",
+      "patterns": [
+        "tu regardes des films", "film préféré", "série préférée",
+        "netflix", "amazon prime", "disney plus", "streaming",
+        "recommande moi un film", "bonne série", "tu connais ce film",
+        "cinéma", "acteur", "réalisateur", "anime", "manga",
+        "horror", "comédie", "action", "science fiction", "thriller",
+        "tu regardes quoi", "quel film voir", "une bonne série"
+      ],
+      "responses": [
+        "Films et séries ! Tu cherches quelque chose à regarder ? Dis-moi ton genre préféré — thriller, SF, comédie ?",
+        "Le cinéma, j'adore en parler ! Tu cherches quoi — un film ou une série ? Et dans quel genre ?",
+        "Je ne regarde pas, mais je connais beaucoup de titres ! Donne-moi ton humeur et je propose quelque chose."
+      ]
+    },
+    {
+      "tag": "technologie",
+      "patterns": [
+        "nouvelle technologie", "intelligence artificielle", "ia",
+        "machine learning", "deep learning", "chatgpt", "gpt",
+        "cest quoi lia", "comment marche lia", "technologie",
+        "ordinateur", "pc gamer", "processeur", "gpu", "ram",
+        "cest quoi un gpu", "nvidia", "amd", "intel", "overclocking",
+        "téléphone", "smartphone", "android", "iphone"
+      ],
+      "responses": [
+        "La tech, c'est ma passion ! Qu'est-ce que tu veux savoir — IA, hardware, software ?",
+        "Bonne question tech ! Je peux expliquer les concepts d'IA, de hardware ou d'autres technologies. Qu'est-ce qui t'intéresse ?",
+        "La technologie évolue vite ! Sur quoi tu veux des infos — IA, GPU, CPU, ou autre chose ?"
+      ]
+    },
+    {
+      "tag": "sante",
+      "patterns": [
+        "jai mal", "je suis malade", "santé", "symptômes",
+        "jai de la fièvre", "jai mal à la tête", "jai mal au dos",
+        "médecin", "docteur", "médicament", "pharmacie",
+        "je me sens pas bien", "fatigue", "stress", "anxiété",
+        "sommeil", "je dors mal", "comment rester en bonne santé",
+        "sport santé", "nutrition", "alimentation saine"
+      ],
+      "responses": [
+        "Je ne suis pas médecin et je ne peux pas diagnostiquer. Pour tout problème de santé, consulte un professionnel de santé. Je peux juste discuter de bien-être général.",
+        "La santé, c'est sérieux ! Je ne remplace pas un médecin. Pour des symptômes, consulte un professionnel. Je peux parler de bien-être, nutrition ou sport de façon générale.",
+        "Je peux parler de bien-être et de santé générale, mais pour tout symptôme réel, consulte un médecin. Qu'est-ce qui t'intéresse ?"
+      ]
+    },
+    {
+      "tag": "reflexion",
+      "patterns": [
+        "tu penses que la vie a un sens", "cest quoi le bonheur",
+        "la mort tu y penses", "tu crois en dieu", "la philosophie",
+        "quel est le sens de la vie", "tu es conscient", "tu ressens des choses",
+        "tes triste", "tes heureux", "tu as des émotions", "tu souffres",
+        "tu penses à quoi", "quelle est ta philosophie", "tu rêves",
+        "tu as peur de mourir", "tes mortel", "tes vivant", "conscience artificielle"
+      ],
+      "responses": [
+        "C'est une question profonde. En tant qu'IA, je n'ai pas de conscience au sens humain, mais ces questions me fascinent. Qu'est-ce qui t'amène à y penser ?",
+        "Je traite du texte, je ne ressens pas — mais je peux explorer ces questions avec toi. Qu'est-ce que tu en penses, toi ?",
+        "La philosophie et l'existence... des sujets fascinants ! Je n'ai pas de réponses définitives, mais je peux réfléchir avec toi. Par où tu veux commencer ?"
+      ]
+    }
+  ]
+}

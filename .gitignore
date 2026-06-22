@@ -1,0 +1,21 @@
+# Clés API — NE JAMAIS COMMITTER
+scripts/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Données générées / temporaires
+donnees/_progres_generation.json
+donnees/memoire.json
+
+# Artefacts système
+12.0.0
+
+# LLM models (trop lourds — plusieurs Go)
+*.gguf
+*.bin
+*.safetensors
