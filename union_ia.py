@@ -41,21 +41,23 @@ def main():
     llm_ok = False
     nom_modele = "Réseau neuronal seul"
 
-    if modeles_dispo["deepseek"]:
-        afficher_chargement_llm("DeepSeek R1 Llama 8B")
+    # Le backend est auto-détecté dans LLMCerveau.__init__ via .env
+    if cerveau.llm.actif:
+        llm_ok = True
+        nom_modele = cerveau.llm.stats().get("modele", "UNION IA")
+    elif modeles_dispo.get("deepseek-local"):
+        afficher_chargement_llm("DeepSeek R1 local")
         ok, msg = cerveau.charger_llm("deepseek")
         if ok:
-            llm_ok = True
-            nom_modele = msg
+            llm_ok, nom_modele = True, msg
             afficher_chargement_llm_ok(msg)
         else:
             afficher_chargement_llm_echec(msg)
-    elif modeles_dispo["kimi"]:
-        afficher_chargement_llm("Kimi K2 Instruct")
+    elif modeles_dispo.get("kimi-local"):
+        afficher_chargement_llm("Kimi K2 local")
         ok, msg = cerveau.charger_llm("kimi")
         if ok:
-            llm_ok = True
-            nom_modele = msg
+            llm_ok, nom_modele = True, msg
             afficher_chargement_llm_ok(msg)
         else:
             afficher_chargement_llm_echec(msg)
