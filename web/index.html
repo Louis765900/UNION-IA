@@ -643,6 +643,50 @@ button { font-family: 'Geist', sans-serif; }
   margin: 6px 0 0;
   opacity: 0.5;
 }
+
+/* ── Drag & drop ──────────────────────────────────────────────────────────── */
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,13,20,0.8);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#drop-overlay.show { display: flex; }
+.drop-card {
+  border: 2px dashed var(--cyan);
+  border-radius: 16px;
+  padding: 48px 64px;
+  text-align: center;
+  background: var(--surface);
+}
+.drop-card .msym { font-size: 48px !important; color: var(--cyan); }
+.drop-card h3 { margin: 12px 0 4px; color: var(--txt); font-size: 18px; }
+.drop-card p { margin: 0; color: var(--txt-dim); font-size: 13px; }
+#attached-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px 8px;
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sfc-mid);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  color: var(--txt-mid);
+  font-family: 'JetBrains Mono', monospace;
+}
+.file-chip .rm { cursor: pointer; color: var(--txt-dim); display: flex; }
+.file-chip .rm:hover { color: var(--err); }
 </style>
 </head>
 <body>
@@ -767,9 +811,19 @@ button { font-family: 'Geist', sans-serif; }
 
   </div>
 
+  <!-- Drag & drop overlay -->
+  <div id="drop-overlay">
+    <div class="drop-card">
+      <span class="msym">upload_file</span>
+      <h3>Dépose tes fichiers ici</h3>
+      <p>Code, texte, JSON, Markdown… UNION IA les lira.</p>
+    </div>
+  </div>
+
   <!-- Input bar -->
   <div id="input-bar">
     <div id="input-wrap">
+      <div id="attached-files"></div>
       <div id="input-box">
         <textarea
           id="chat-input"
@@ -780,9 +834,10 @@ button { font-family: 'Geist', sans-serif; }
         ></textarea>
         <div id="input-actions">
           <div style="display:flex;gap:4px;">
-            <button class="attach-btn" title="Joindre un fichier — utilise @fichier.py dans le message">
+            <button class="attach-btn" title="Joindre un fichier" onclick="document.getElementById('file-input').click()">
               <span class="msym" style="font-size:18px;">attach_file</span>
             </button>
+            <input type="file" id="file-input" multiple style="display:none" onchange="onFilePick(this.files)"/>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
             <span class="input-hint">↵ Envoyer · Maj+↵ Saut de ligne</span>
@@ -1135,6 +1190,71 @@ function usePrompt(t) {
   inp.setSelectionRange(inp.value.length, inp.value.length);
 }
 
+// ── Glisser-déposer / pièces jointes ──────────────────────────────────────────
+let attachedFiles = [];               // [{name, content}]
+const MAX_FILE_SIZE = 500 * 1024;     // 500 Ko par fichier
+const EXT_BINAIRE = /\.(png|jpe?g|gif|webp|bmp|ico|pdf|zip|rar|7z|exe|dll|mp[34]|wav|mov|avi|ttf|woff2?)$/i;
+
+function extDe(nom) {
+  const m = nom.match(/\.([a-z0-9]+)$/i);
+  return m ? m[1].toLowerCase() : 'text';
+}
+
+function renderAttached() {
+  const box = document.getElementById('attached-files');
+  box.innerHTML = '';
+  attachedFiles.forEach((f, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `<span class="msym" style="font-size:14px">description</span>${esc(f.name)}<span class="rm"><span class="msym" style="font-size:14px">close</span></span>`;
+    chip.querySelector('.rm').onclick = () => { attachedFiles.splice(i, 1); renderAttached(); };
+    box.appendChild(chip);
+  });
+}
+
+function onFilePick(fileList) {
+  for (const file of fileList) {
+    if (EXT_BINAIRE.test(file.name)) { continue; }       // ignore les binaires
+    if (file.size > MAX_FILE_SIZE) { continue; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      attachedFiles.push({ name: file.name, content: e.target.result });
+      renderAttached();
+    };
+    reader.readAsText(file);
+  }
+}
+
+function buildMessageWithFiles(text) {
+  if (!attachedFiles.length) return text;
+  let bloc = text ? text + '\n' : '';
+  for (const f of attachedFiles) {
+    bloc += `\n**Fichier \`${f.name}\` :**\n\`\`\`${extDe(f.name)}\n${f.content}\n\`\`\`\n`;
+  }
+  return bloc;
+}
+
+// Overlay drag & drop sur toute la fenêtre
+let _dragDepth = 0;
+window.addEventListener('dragenter', e => {
+  if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+    e.preventDefault();
+    _dragDepth++;
+    document.getElementById('drop-overlay').classList.add('show');
+  }
+});
+window.addEventListener('dragover', e => { if (e.dataTransfer) e.preventDefault(); });
+window.addEventListener('dragleave', e => {
+  _dragDepth = Math.max(0, _dragDepth - 1);
+  if (_dragDepth === 0) document.getElementById('drop-overlay').classList.remove('show');
+});
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  _dragDepth = 0;
+  document.getElementById('drop-overlay').classList.remove('show');
+  if (e.dataTransfer && e.dataTransfer.files.length) onFilePick(e.dataTransfer.files);
+});
+
 // ── Sidebar : sélection active ─────────────────────────────────────────────────
 function setActiveConv(id) {
   convs.forEach(c => c.el.classList.toggle('active', c.id === id));
@@ -1236,15 +1356,25 @@ async function sendMessage() {
   if (isStreaming) return;
   const inp = document.getElementById('chat-input');
   const text = inp.value.trim();
-  if (!text) return;
+  if (!text && !attachedFiles.length) return;
+
+  // Message affiché à l'utilisateur (texte + indication des fichiers joints)
+  const apercuFichiers = attachedFiles.length
+    ? '\n\n' + attachedFiles.map(f => '📎 ' + f.name).join('\n')
+    : '';
+  const messageAffiche = (text || '(fichiers joints)') + apercuFichiers;
+  // Message réellement envoyé au modèle (avec le contenu des fichiers)
+  const messageComplet = buildMessageWithFiles(text);
 
   inp.value = '';
   autoResize(inp);
+  attachedFiles = [];
+  renderAttached();
   isStreaming = true;
   document.getElementById('send-btn').disabled = true;
 
   showChat();
-  appendUserMsg(text);
+  appendUserMsg(messageAffiche);
 
   const wasNew = !activeConvId;
   let ai = null;
@@ -1255,7 +1385,7 @@ async function sendMessage() {
     const resp = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, conversation_id: activeConvId }),
+      body: JSON.stringify({ message: messageComplet, conversation_id: activeConvId }),
     });
 
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
