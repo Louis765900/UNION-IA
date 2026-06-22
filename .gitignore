@@ -1,4 +1,5 @@
 # Clés API — NE JAMAIS COMMITTER
+.env
 scripts/.env
 
 # Python

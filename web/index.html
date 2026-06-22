@@ -511,6 +511,34 @@ button { font-family: 'Geist', sans-serif; }
 .prose th { background: var(--sfc-low); color: var(--txt-mid); font-weight: 600; }
 .prose tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
 
+/* ── Model menu ────────────────────────────────────────────────────────────── */
+.model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--txt-dim);
+  transition: background 0.1s, color 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.model-item:hover { background: var(--sfc-mid); color: var(--txt); }
+.model-item.active { color: var(--cyan); }
+.model-item .model-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--txt-dim);
+}
+.model-item.active .model-badge { border-color: var(--cyan); color: var(--cyan); }
+
 /* ── Input bar ─────────────────────────────────────────────────────────────── */
 #input-bar {
   position: absolute;
@@ -634,11 +662,19 @@ button { font-family: 'Geist', sans-serif; }
 
   <!-- Header -->
   <header id="topbar">
-    <div style="display:flex;align-items:center;">
+    <div style="display:flex;align-items:center;gap:10px;">
       <span class="tb-logo">UNION IA</span>
-      <div class="tb-chip">
+      <div class="tb-chip" id="status-chip-wrap">
         <div class="tb-dot" id="status-dot"></div>
         <span class="jb" style="font-size:11px;color:var(--txt);" id="status-chip">Chargement…</span>
+      </div>
+      <div id="model-picker" style="display:none;position:relative;">
+        <button class="tb-chip" id="model-btn" onclick="toggleModelMenu()" style="background:var(--sfc-mid);border:1px solid var(--border);cursor:pointer;gap:6px;padding:4px 10px;">
+          <span class="msym" style="font-size:15px;color:var(--txt-dim)">swap_horiz</span>
+          <span class="jb" style="font-size:11px;color:var(--txt-dim);" id="model-btn-label">Changer</span>
+        </button>
+        <div id="model-menu" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;min-width:220px;z-index:100;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+        </div>
       </div>
     </div>
     <div class="tb-actions">
@@ -756,6 +792,77 @@ let isStreaming = false;
 let convs = [];
 let activeConvId = null;
 let _statusSource = 'ia';
+let _modelMenuOpen = false;
+
+// ── Model picker ──────────────────────────────────────────────────────────────
+const MODEL_LABELS = {
+  'deepseek-api':   { label: 'DeepSeek', badge: 'API Cloud' },
+  'gemini-api':     { label: 'Gemini',   badge: 'API Cloud' },
+  'deepseek-local': { label: 'DeepSeek', badge: 'Local' },
+  'kimi-local':     { label: 'Kimi K2',  badge: 'Local' },
+};
+
+async function loadModelPicker(actif) {
+  try {
+    const r = await fetch('/api/modeles');
+    const d = await r.json();
+    const menu = document.getElementById('model-menu');
+    menu.innerHTML = '';
+
+    const disponibles = d.disponibles || {};
+    let hasAny = false;
+
+    for (const [id, info] of Object.entries(MODEL_LABELS)) {
+      if (!disponibles[id]) continue;
+      hasAny = true;
+      const btn = document.createElement('button');
+      btn.className = 'model-item' + (id === actif ? ' active' : '');
+      btn.innerHTML = `<span class="msym" style="font-size:17px;flex-shrink:0">${id.includes('gemini') ? 'auto_awesome' : 'memory'}</span>
+        <span>${info.label}</span>
+        <span class="model-badge">${info.badge}</span>`;
+      btn.onclick = () => switchModel(id);
+      menu.appendChild(btn);
+    }
+
+    if (hasAny) {
+      document.getElementById('model-picker').style.display = '';
+    }
+  } catch {}
+}
+
+function toggleModelMenu() {
+  _modelMenuOpen = !_modelMenuOpen;
+  document.getElementById('model-menu').style.display = _modelMenuOpen ? '' : 'none';
+}
+
+document.addEventListener('click', e => {
+  if (_modelMenuOpen && !e.target.closest('#model-picker')) {
+    _modelMenuOpen = false;
+    document.getElementById('model-menu').style.display = 'none';
+  }
+});
+
+async function switchModel(id) {
+  _modelMenuOpen = false;
+  document.getElementById('model-menu').style.display = 'none';
+  document.getElementById('status-chip').textContent = 'Chargement…';
+  try {
+    const r = await fetch('/api/modele', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modele: id }),
+    });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('status-chip').textContent = MODEL_LABELS[d.modele]?.label || 'UNION IA';
+      await loadModelPicker(d.modele);
+    } else {
+      document.getElementById('status-chip').textContent = 'Erreur';
+    }
+  } catch {
+    document.getElementById('status-chip').textContent = 'Erreur';
+  }
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
@@ -763,10 +870,13 @@ async function init() {
     const r = await fetch('/api/status');
     const d = await r.json();
 
-    // Chip : juste le nom du modèle, sans infos hardware
-    const chip = d.llm_actif ? d.modele : 'Réseau neuronal';
+    const backendId = d.modele_id || 'ia';
+    const chip = d.llm_actif
+      ? (MODEL_LABELS[backendId]?.label || 'UNION IA')
+      : 'Réseau neuronal';
     document.getElementById('status-chip').textContent = chip;
-    _statusSource = d.modele_id || 'ia';
+    _statusSource = backendId;
+    await loadModelPicker(backendId);
 
     if (d.utilisateur) {
       document.getElementById('user-name').textContent = d.utilisateur;

@@ -33,8 +33,9 @@ COMMANDES = {
     "/stats": "Statistiques de la session",
     "/historique": "Voir les derniers échanges",
     "/oublier": "Effacer l'historique de conversation",
-    "/modele deepseek": "Passer au modèle DeepSeek R1",
-    "/modele kimi": "Passer au modèle Kimi K2",
+    "/modele deepseek": "Passer sur DeepSeek (API ou local)",
+    "/modele gemini": "Passer sur Gemini API",
+    "/modele kimi": "Passer sur Kimi (local)",
     "/nom [prénom]": "Changer ton prénom mémorisé",
     "/quitter": "Quitter UNION IA",
 }
@@ -139,12 +140,12 @@ class Cerveau:
 
         if cmd.startswith("/modele "):
             choix = cmd.split("/modele ")[1].strip()
-            if choix in ("deepseek", "kimi"):
+            if choix in ("deepseek", "gemini", "kimi", "deepseek-api", "gemini-api", "kimi-local"):
                 ok, msg = self.llm.charger(choix)
                 if ok:
-                    return f"Modèle changé : {msg} est maintenant actif."
+                    return f"Backend changé : {msg} est maintenant actif."
                 return f"Erreur de chargement : {msg}"
-            return "Modèle inconnu. Essaie `/modele deepseek` ou `/modele kimi`."
+            return "Backend inconnu. Essaie `/modele deepseek`, `/modele gemini` ou `/modele kimi`."
 
         if cmd.startswith("/nom "):
             nouveau = texte.strip()[5:].strip()

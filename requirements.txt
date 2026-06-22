@@ -1,3 +1,12 @@
+# Core
 numpy>=1.21.0
 rich>=12.0.0
-llama-cpp-python>=0.3.0
+flask>=2.3.0
+
+# LLM Cloud APIs (priorité sur le local)
+openai>=1.0.0              # DeepSeek API (compatible OpenAI)
+google-generativeai>=0.8.0 # Gemini API
+
+# LLM local (fallback, nécessite GPU + fichiers GGUF)
+# Décommente la ligne suivante si tu utilises les modèles locaux
+# llama-cpp-python>=0.3.0

@@ -21,20 +21,10 @@ _entraineur = Entraineur()
 _entraineur.entrainer(force=False)
 _cerveau = Cerveau(_entraineur)
 
-_modeles = LLMCerveau.modeles_disponibles()
-_nom_modele = "Réseau neuronal"
-_llm_ok = False
+_llm_ok = _cerveau.llm.actif
+_nom_modele = _cerveau.llm.stats().get("modele", "Réseau neuronal") if _llm_ok else "Réseau neuronal"
 
-if _modeles["deepseek"]:
-    ok, msg = _cerveau.charger_llm("deepseek")
-    if ok:
-        _llm_ok, _nom_modele = True, msg
-elif _modeles["kimi"]:
-    ok, msg = _cerveau.charger_llm("kimi")
-    if ok:
-        _llm_ok, _nom_modele = True, msg
-
-print(f"Modèle : {_nom_modele}")
+print(f"Backend : {_nom_modele}")
 print("Prêt → http://127.0.0.1:5000")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -126,6 +116,26 @@ def api_history_delete():
     if _cerveau.llm.actif:
         _cerveau.llm.vider_historique()
     return jsonify({"success": True})
+
+@app.route("/api/modeles")
+def api_modeles():
+    disponibles = LLMCerveau.modeles_disponibles()
+    return jsonify({
+        "disponibles": disponibles,
+        "actif": _cerveau.llm.modele_actif,
+    })
+
+@app.route("/api/modele", methods=["POST"])
+def api_changer_modele():
+    data = request.get_json(force=True, silent=True) or {}
+    modele = (data.get("modele") or "").strip()
+    if not modele:
+        return jsonify({"error": "Paramètre modele manquant"}), 400
+    with _llm_lock:
+        ok, msg = _cerveau.charger_llm(modele)
+    if ok:
+        return jsonify({"success": True, "message": msg, "modele": _cerveau.llm.modele_actif})
+    return jsonify({"success": False, "error": msg}), 400
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False, threaded=True, use_reloader=False)
