@@ -50,20 +50,21 @@ MODE_DEFAUT = "2.1"
 
 
 def _charger_env():
-    """Charge le .env à la racine du projet s'il existe."""
-    env_path = _BASE_DIR / ".env"
-    if not env_path.exists():
-        return
-    try:
-        with open(env_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                cle, _, valeur = line.partition("=")
-                os.environ.setdefault(cle.strip(), valeur.strip())
-    except Exception:
-        pass
+    """Charge les variables depuis .env (racine) puis scripts/.env (fallback).
+    Les valeurs déjà présentes dans l'environnement ne sont pas écrasées."""
+    for env_path in (_BASE_DIR / ".env", _BASE_DIR / "scripts" / ".env"):
+        if not env_path.exists():
+            continue
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    cle, _, valeur = line.partition("=")
+                    os.environ.setdefault(cle.strip(), valeur.strip())
+        except Exception:
+            pass
 
 
 def _lire_system_prompt() -> str:
