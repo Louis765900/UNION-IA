@@ -870,6 +870,13 @@ async function init() {
     const r = await fetch('/api/status');
     const d = await r.json();
 
+    if (d.initialisation) {
+      document.getElementById('status-chip').textContent = 'Démarrage…';
+      document.getElementById('status-dot').style.background = 'var(--cyan)';
+      setTimeout(init, 1500);
+      return;
+    }
+
     const backendId = d.modele_id || 'ia';
     const chip = d.llm_actif
       ? (MODEL_LABELS[backendId]?.label || 'UNION IA')
