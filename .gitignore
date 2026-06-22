@@ -20,3 +20,11 @@ donnees/memoire.json
 *.gguf
 *.bin
 *.safetensors
+
+# Environnement de test
+.venv-test/
+.venv/
+
+# Base de données locale
+donnees/union_ia.db
+donnees/union_ia.db-*

@@ -1,24 +1,52 @@
 """
 Backend LLM de UNION IA.
 
-Priorité de chargement :
-  1. DeepSeek API (cloud, clé DEEPSEEK_API_KEY dans .env)
-  2. Gemini API   (cloud, clé GEMINI_API_KEY dans .env)
-  3. Modèle local llama.cpp (GGUF, Windows uniquement)
+Architecture :
+  - Plusieurs MOTEURS (DeepSeek API, Gemini API, llama.cpp local) interchangeables.
+  - Trois MODES qui forment la gamme UNION IA, à la manière de Gemini :
+        • UNION IA 2.1            → réponses complètes, raisonnement approfondi
+        • UNION IA 2.1 Flash      → rapide, concis, pour le quotidien
+        • UNION IA 2.1 Flashlight → ultra-rapide, réponses très courtes
+  - Injection du contexte mémoire (faits sur l'utilisateur) dans le system prompt.
+
+Le moteur est choisi automatiquement selon les clés API disponibles ; le mode
+est réglable indépendamment (commande /mode ou sélecteur web).
 """
 
 import os
 import re
-import json
+import importlib.util
 from pathlib import Path
 
 # ── Chemins ────────────────────────────────────────────────────────────────────
 _BASE_DIR = Path(__file__).parent.parent
 _PROMPT_FILE = _BASE_DIR / "system_prompt.md"
 
-# Chemins locaux (fallback Windows)
 _MODELE_DEEPSEEK_LOCAL = Path(r"C:\Users\Louis\.lmstudio\models\matrixportalx\DeepSeek-R1-Distill-Llama-8B-Abliterated-Q4_K_M-GGUF\deepseek-r1-distill-llama-8b-abliterated-q4_k_m.gguf")
 _MODELE_KIMI_LOCAL = Path(r"C:\Users\Louis\.lmstudio\models\ubergarm\Kimi-K2-Instruct-GGUF\imatrix-mainline-pr9400-plus-kimi-k2-942c55cd5-Kimi-K2-Instruct-Q8_0.gguf")
+
+# ── Gamme UNION IA : les modes ──────────────────────────────────────────────────
+MODES = {
+    "2.1": {
+        "label": "UNION IA 2.1",
+        "max_tokens": 2048,
+        "temperature": 0.7,
+        "hint": "",
+    },
+    "flash": {
+        "label": "UNION IA 2.1 Flash",
+        "max_tokens": 1024,
+        "temperature": 0.7,
+        "hint": "Réponds de manière concise et directe, sans détour.",
+    },
+    "flashlight": {
+        "label": "UNION IA 2.1 Flashlight",
+        "max_tokens": 400,
+        "temperature": 0.6,
+        "hint": "Réponds en 1 à 3 phrases maximum. Va droit à l'essentiel.",
+    },
+}
+MODE_DEFAUT = "2.1"
 
 
 def _charger_env():
@@ -48,173 +76,204 @@ def _lire_system_prompt() -> str:
         )
 
 
-# ── Backend DeepSeek API ────────────────────────────────────────────────────────
+def construire_systeme(nom: str | None, contexte_memoire: str | None,
+                       mode_hint: str) -> str:
+    """Assemble le system prompt complet : personnalité + mémoire + mode."""
+    parties = [_lire_system_prompt()]
+    if nom:
+        parties.append(f"L'utilisateur s'appelle {nom}.")
+    if contexte_memoire:
+        parties.append(
+            "Voici ce que tu sais déjà sur l'utilisateur (utilise ces "
+            "informations naturellement, sans les répéter mot pour mot) :\n"
+            + contexte_memoire
+        )
+    if mode_hint:
+        parties.append(mode_hint)
+    return "\n\n".join(parties)
 
-class _BackendDeepSeek:
-    NOM = "UNION IA"
-    ID = "deepseek"
-    ENDPOINT = "https://api.deepseek.com"
-    MODELE = "deepseek-chat"
 
-    def __init__(self, api_key: str):
-        # Import différé — ne bloque pas le démarrage
+# ── Parser de streaming partagé (gère les balises <think>…</think>) ─────────────
+
+def _parser_think(deltas):
+    """Transforme un flux de fragments de texte en évènements UNION IA.
+
+    Prend un itérable qui yield des chaînes (fragments du LLM).
+    Yield des tuples (phase, contenu) :
+        'signal'   → 'penser_debut' | 'penser_fin'
+        'penser'   → fragment de raisonnement interne
+        'repondre' → fragment de la réponse finale
+        'done'     → texte complet de la réponse (sans le raisonnement)
+    """
+    reponse_complete = ""
+    en_think = False
+    tampon = ""
+
+    for delta in deltas:
+        if not delta:
+            continue
+        tampon += delta
+        while tampon:
+            if not en_think:
+                idx = tampon.find("<think>")
+                if idx == -1:
+                    # Garde un éventuel début de balise partielle en fin de tampon
+                    garde = _suffixe_partiel(tampon, "<think>")
+                    a_emettre = tampon[: len(tampon) - garde] if garde else tampon
+                    if a_emettre:
+                        reponse_complete += a_emettre
+                        yield ("repondre", a_emettre)
+                    tampon = tampon[len(tampon) - garde:] if garde else ""
+                    break
+                elif idx == 0:
+                    en_think = True
+                    tampon = tampon[7:]
+                    yield ("signal", "penser_debut")
+                else:
+                    avant = tampon[:idx]
+                    reponse_complete += avant
+                    yield ("repondre", avant)
+                    tampon = tampon[idx:]
+            else:
+                idx = tampon.find("</think>")
+                if idx == -1:
+                    garde = _suffixe_partiel(tampon, "</think>")
+                    a_emettre = tampon[: len(tampon) - garde] if garde else tampon
+                    if a_emettre:
+                        yield ("penser", a_emettre)
+                    tampon = tampon[len(tampon) - garde:] if garde else ""
+                    break
+                else:
+                    if idx > 0:
+                        yield ("penser", tampon[:idx])
+                    tampon = tampon[idx + 8:]
+                    en_think = False
+                    yield ("signal", "penser_fin")
+
+    if tampon and not en_think:
+        reponse_complete += tampon
+        yield ("repondre", tampon)
+
+    yield ("done", reponse_complete.strip())
+
+
+def _suffixe_partiel(texte: str, balise: str) -> int:
+    """Longueur du suffixe de `texte` qui pourrait être un début de `balise`.
+    Évite de couper une balise <think> à cheval sur deux fragments."""
+    maxi = min(len(texte), len(balise) - 1)
+    for n in range(maxi, 0, -1):
+        if balise.startswith(texte[-n:]):
+            return n
+    return 0
+
+
+# ── Moteur DeepSeek API (compatible OpenAI) ─────────────────────────────────────
+
+class _MoteurOpenAI:
+    """Moteur générique pour toute API compatible OpenAI (DeepSeek inclus)."""
+
+    def __init__(self, api_key: str, base_url: str, modele: str):
         self._api_key = api_key
+        self._base_url = base_url
+        self._modele = modele
         self._client = None
-        self._modele = self.MODELE
 
     def _get_client(self):
         if self._client is None:
             from openai import OpenAI
-            self._client = OpenAI(api_key=self._api_key, base_url=self.ENDPOINT)
+            self._client = OpenAI(api_key=self._api_key, base_url=self._base_url)
         return self._client
 
-    def _messages(self, message: str, historique: list, nom: str | None) -> list:
-        sys = _lire_system_prompt()
-        if nom:
-            sys += f"\n\nL'utilisateur s'appelle {nom}."
-        msgs = [{"role": "system", "content": sys}]
+    def _messages(self, systeme: str, historique: list, message: str) -> list:
+        msgs = [{"role": "system", "content": systeme}]
         for h in historique[-10:]:
             msgs.append({"role": "user", "content": h["user"]})
             msgs.append({"role": "assistant", "content": h["assistant"]})
         msgs.append({"role": "user", "content": message})
         return msgs
 
-    def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
+    def completer(self, systeme, historique, message, params) -> str | None:
         try:
             res = self._get_client().chat.completions.create(
                 model=self._modele,
-                messages=self._messages(message, historique, nom),
-                max_tokens=2048,
-                temperature=0.75,
+                messages=self._messages(systeme, historique, message),
+                max_tokens=params["max_tokens"],
+                temperature=params["temperature"],
             )
-            reponse = res.choices[0].message.content or ""
-            reponse = re.sub(r"<think>.*?</think>", "", reponse, flags=re.DOTALL).strip()
-            return reponse or None
+            rep = res.choices[0].message.content or ""
+            rep = re.sub(r"<think>.*?</think>", "", rep, flags=re.DOTALL).strip()
+            return rep or None
         except Exception:
             return None
 
-    def repondre_stream(self, message: str, historique: list, nom: str | None = None):
-        try:
-            stream = self._get_client().chat.completions.create(
-                model=self._modele,
-                messages=self._messages(message, historique, nom),
-                max_tokens=2048,
-                temperature=0.75,
-                stream=True,
-            )
-            reponse_complete = ""
-            en_think = False
-            tampon = ""
-
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content or ""
-                if not delta:
-                    continue
-                tampon += delta
-
-                while tampon:
-                    if not en_think:
-                        idx = tampon.find("<think>")
-                        if idx == -1:
-                            reponse_complete += tampon
-                            yield ("repondre", tampon)
-                            tampon = ""
-                        elif idx == 0:
-                            en_think = True
-                            tampon = tampon[7:]
-                            yield ("signal", "penser_debut")
-                        else:
-                            avant = tampon[:idx]
-                            reponse_complete += avant
-                            yield ("repondre", avant)
-                            tampon = tampon[idx:]
-                    else:
-                        idx = tampon.find("</think>")
-                        if idx == -1:
-                            yield ("penser", tampon)
-                            tampon = ""
-                        else:
-                            if idx > 0:
-                                yield ("penser", tampon[:idx])
-                            tampon = tampon[idx + 8:]
-                            en_think = False
-                            yield ("signal", "penser_fin")
-
-            if tampon and not en_think:
-                reponse_complete += tampon
-                yield ("repondre", tampon)
-
-            yield ("done", reponse_complete.strip())
-
-        except KeyboardInterrupt:
-            yield ("done", "")
-        except Exception as e:
-            yield ("erreur", str(e))
+    def stream_deltas(self, systeme, historique, message, params):
+        stream = self._get_client().chat.completions.create(
+            model=self._modele,
+            messages=self._messages(systeme, historique, message),
+            max_tokens=params["max_tokens"],
+            temperature=params["temperature"],
+            stream=True,
+        )
+        for chunk in stream:
+            yield chunk.choices[0].delta.content or ""
 
 
-# ── Backend Gemini API ──────────────────────────────────────────────────────────
+# ── Moteur Gemini API ───────────────────────────────────────────────────────────
 
-class _BackendGemini:
-    NOM = "UNION IA"
-    ID = "gemini"
-    MODELE = "gemini-2.0-flash"
-
-    def __init__(self, api_key: str):
-        # Import différé — ne bloque pas le démarrage
+class _MoteurGemini:
+    def __init__(self, api_key: str, modele: str = "gemini-2.0-flash"):
         self._api_key = api_key
+        self._modele = modele
 
-    def _construire_historique_gemini(self, historique: list) -> list:
+    def _get_model(self, systeme: str):
+        import google.generativeai as genai
+        genai.configure(api_key=self._api_key)
+        return genai.GenerativeModel(model_name=self._modele, system_instruction=systeme)
+
+    def _historique(self, historique: list) -> list:
         msgs = []
         for h in historique[-10:]:
             msgs.append({"role": "user", "parts": [h["user"]]})
             msgs.append({"role": "model", "parts": [h["assistant"]]})
         return msgs
 
-    def _get_model(self, nom: str | None = None):
-        import google.generativeai as genai
-        genai.configure(api_key=self._api_key)
-        sys_prompt = _lire_system_prompt()
-        if nom:
-            sys_prompt += f"\n\nL'utilisateur s'appelle {nom}."
-        return genai.GenerativeModel(model_name=self.MODELE, system_instruction=sys_prompt)
-
-    def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
+    def completer(self, systeme, historique, message, params) -> str | None:
         try:
-            model = self._get_model(nom)
-            chat = model.start_chat(history=self._construire_historique_gemini(historique))
-            res = chat.send_message(message)
+            import google.generativeai as genai
+            model = self._get_model(systeme)
+            chat = model.start_chat(history=self._historique(historique))
+            res = chat.send_message(
+                message,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=params["max_tokens"],
+                    temperature=params["temperature"],
+                ),
+            )
             return res.text.strip() or None
         except Exception:
             return None
 
-    def repondre_stream(self, message: str, historique: list, nom: str | None = None):
-        try:
-            model = self._get_model(nom)
-            chat = model.start_chat(history=self._construire_historique_gemini(historique))
-            stream = chat.send_message(message, stream=True)
-            reponse_complete = ""
-            for chunk in stream:
-                texte = chunk.text or ""
-                if texte:
-                    reponse_complete += texte
-                    yield ("repondre", texte)
-            yield ("done", reponse_complete.strip())
-        except KeyboardInterrupt:
-            yield ("done", "")
-        except Exception as e:
-            yield ("erreur", str(e))
+    def stream_deltas(self, systeme, historique, message, params):
+        import google.generativeai as genai
+        model = self._get_model(systeme)
+        chat = model.start_chat(history=self._historique(historique))
+        stream = chat.send_message(
+            message,
+            stream=True,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=params["max_tokens"],
+                temperature=params["temperature"],
+            ),
+        )
+        for chunk in stream:
+            yield chunk.text or ""
 
 
-# ── Backend local llama.cpp ─────────────────────────────────────────────────────
+# ── Moteur local llama.cpp ──────────────────────────────────────────────────────
 
-class _BackendLocal:
-    NOM = "UNION IA"
-    ID = "local"
-
-    def __init__(self, chemin: Path, nom_modele: str):
-        # Import différé — le chargement GGUF est lourd, on attend le premier message
+class _MoteurLocal:
+    def __init__(self, chemin: Path):
         self._chemin = chemin
-        self._nom = nom_modele
         self._llm = None
 
     def _get_llm(self):
@@ -222,7 +281,7 @@ class _BackendLocal:
             from llama_cpp import Llama
             self._llm = Llama(
                 model_path=str(self._chemin),
-                n_ctx=4096,
+                n_ctx=8192,
                 n_gpu_layers=16,
                 n_threads=8,
                 verbose=False,
@@ -230,237 +289,220 @@ class _BackendLocal:
             )
         return self._llm
 
-    def _messages(self, message: str, historique: list, nom: str | None) -> list:
-        sys = _lire_system_prompt()
-        if nom:
-            sys += f"\n\nL'utilisateur s'appelle {nom}."
-        msgs = [{"role": "system", "content": sys}]
+    def _messages(self, systeme: str, historique: list, message: str) -> list:
+        msgs = [{"role": "system", "content": systeme}]
         for h in historique[-8:]:
             msgs.append({"role": "user", "content": h["user"]})
             msgs.append({"role": "assistant", "content": h["assistant"]})
         msgs.append({"role": "user", "content": message})
         return msgs
 
-    def repondre(self, message: str, historique: list, nom: str | None = None) -> str | None:
+    def completer(self, systeme, historique, message, params) -> str | None:
         try:
             res = self._get_llm().create_chat_completion(
-                messages=self._messages(message, historique, nom),
-                max_tokens=2048,
-                temperature=0.75,
+                messages=self._messages(systeme, historique, message),
+                max_tokens=params["max_tokens"],
+                temperature=params["temperature"],
                 top_p=0.92,
                 repeat_penalty=1.05,
                 stop=["<|im_end|>", "</s>", "<|end|>"],
             )
-            reponse = res["choices"][0]["message"]["content"].strip()
-            reponse = re.sub(r"<think>.*?</think>", "", reponse, flags=re.DOTALL).strip()
-            return reponse or None
+            rep = res["choices"][0]["message"]["content"].strip()
+            rep = re.sub(r"<think>.*?</think>", "", rep, flags=re.DOTALL).strip()
+            return rep or None
         except Exception:
             return None
 
-    def repondre_stream(self, message: str, historique: list, nom: str | None = None):
-        try:
-            stream = self._get_llm().create_chat_completion(
-                messages=self._messages(message, historique, nom),
-                max_tokens=2048,
-                temperature=0.75,
-                top_p=0.92,
-                repeat_penalty=1.05,
-                stop=["<|im_end|>", "</s>", "<|end|>"],
-                stream=True,
-            )
-            reponse_complete = ""
-            en_think = False
-            tampon = ""
-
-            for chunk in stream:
-                delta = chunk["choices"][0]["delta"].get("content", "")
-                if not delta:
-                    continue
-                tampon += delta
-
-                while tampon:
-                    if not en_think:
-                        idx = tampon.find("<think>")
-                        if idx == -1:
-                            reponse_complete += tampon
-                            yield ("repondre", tampon)
-                            tampon = ""
-                        elif idx == 0:
-                            en_think = True
-                            tampon = tampon[7:]
-                            yield ("signal", "penser_debut")
-                        else:
-                            avant = tampon[:idx]
-                            reponse_complete += avant
-                            yield ("repondre", avant)
-                            tampon = tampon[idx:]
-                    else:
-                        idx = tampon.find("</think>")
-                        if idx == -1:
-                            yield ("penser", tampon)
-                            tampon = ""
-                        else:
-                            if idx > 0:
-                                yield ("penser", tampon[:idx])
-                            tampon = tampon[idx + 8:]
-                            en_think = False
-                            yield ("signal", "penser_fin")
-
-            if tampon and not en_think:
-                reponse_complete += tampon
-                yield ("repondre", tampon)
-
-            yield ("done", reponse_complete.strip())
-
-        except KeyboardInterrupt:
-            yield ("done", "")
-        except Exception as e:
-            yield ("erreur", str(e))
+    def stream_deltas(self, systeme, historique, message, params):
+        stream = self._get_llm().create_chat_completion(
+            messages=self._messages(systeme, historique, message),
+            max_tokens=params["max_tokens"],
+            temperature=params["temperature"],
+            top_p=0.92,
+            repeat_penalty=1.05,
+            stop=["<|im_end|>", "</s>", "<|end|>"],
+            stream=True,
+        )
+        for chunk in stream:
+            yield chunk["choices"][0]["delta"].get("content", "")
 
 
 # ── Façade publique ─────────────────────────────────────────────────────────────
 
 class LLMCerveau:
-    """Point d'entrée unique pour le backend LLM.
+    """Point d'entrée unique pour le LLM de UNION IA.
 
-    Détection automatique au démarrage :
-      1. DeepSeek API (DEEPSEEK_API_KEY dans .env ou env)
-      2. Gemini API   (GEMINI_API_KEY dans .env ou env)
-      3. Modèle local llama.cpp (GGUF)
+    Détection automatique du moteur au démarrage :
+      1. DeepSeek API   (DEEPSEEK_API_KEY)
+      2. Gemini API     (GEMINI_API_KEY)
+      3. llama.cpp local (GGUF, si llama-cpp installé)
     """
 
-    def __init__(self):
+    def __init__(self, mode: str = MODE_DEFAUT):
         _charger_env()
-        self._backend = None
+        self._moteur = None
+        self.moteur_id: str | None = None
+        self.mode = mode if mode in MODES else MODE_DEFAUT
         self.historique: list[dict] = []
-        self.modele_actif: str | None = None
+        # Fournisseur de contexte mémoire (callable -> str), branché par le Cerveau
+        self.fournir_memoire = None
+        self.nom_utilisateur = None
         self._auto_charger()
 
-    def _auto_charger(self):
-        """Sélectionne le meilleur backend disponible — sans aucun import réseau.
-        Les librairies sont importées paresseusement au premier message."""
+    # ── Sélection du moteur ──────────────────────────────────────────────────
 
-        # 1. DeepSeek API
+    def _auto_charger(self):
         cle_ds = os.environ.get("DEEPSEEK_API_KEY", "")
         if cle_ds and not cle_ds.startswith("sk-REMPLACE"):
-            self._backend = _BackendDeepSeek(cle_ds)
-            self.modele_actif = "deepseek-api"
+            self._moteur = _MoteurOpenAI(cle_ds, "https://api.deepseek.com", "deepseek-chat")
+            self.moteur_id = "deepseek-api"
             return
 
-        # 2. Gemini API
         cle_gem = os.environ.get("GEMINI_API_KEY", "")
         if cle_gem and not cle_gem.startswith("AIzaSy_REMPLACE"):
-            self._backend = _BackendGemini(cle_gem)
-            self.modele_actif = "gemini-api"
+            self._moteur = _MoteurGemini(cle_gem)
+            self.moteur_id = "gemini-api"
             return
 
-        # 3. Modèle local — uniquement si llama-cpp est installé
         if self._llama_cpp_disponible():
             if _MODELE_DEEPSEEK_LOCAL.exists():
-                self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
-                self.modele_actif = "deepseek-local"
+                self._moteur = _MoteurLocal(_MODELE_DEEPSEEK_LOCAL)
+                self.moteur_id = "deepseek-local"
                 return
             if _MODELE_KIMI_LOCAL.exists():
-                self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
-                self.modele_actif = "kimi-local"
+                self._moteur = _MoteurLocal(_MODELE_KIMI_LOCAL)
+                self.moteur_id = "kimi-local"
 
-    def charger(self, modele: str = "deepseek") -> tuple[bool, str]:
-        """Charge manuellement un backend spécifique (commande /modele)."""
+    def charger(self, moteur: str) -> tuple[bool, str]:
+        """Change de moteur manuellement (commande /modele ou sélecteur web)."""
         _charger_env()
 
-        if modele in ("deepseek", "deepseek-api"):
+        if moteur in ("deepseek", "deepseek-api"):
             cle = os.environ.get("DEEPSEEK_API_KEY", "")
             if cle and not cle.startswith("sk-REMPLACE"):
-                try:
-                    self._backend = _BackendDeepSeek(cle)
-                    self.modele_actif = "deepseek-api"
-                    self.historique.clear()
-                    return True, "UNION IA (DeepSeek API)"
-                except Exception as e:
-                    return False, str(e)
-            if _MODELE_DEEPSEEK_LOCAL.exists():
-                try:
-                    self._backend = _BackendLocal(_MODELE_DEEPSEEK_LOCAL, "deepseek")
-                    self.modele_actif = "deepseek-local"
-                    self.historique.clear()
-                    return True, "UNION IA (local DeepSeek)"
-                except Exception as e:
-                    return False, str(e)
-            return False, "DeepSeek non disponible (ni API ni fichier local)"
+                self._moteur = _MoteurOpenAI(cle, "https://api.deepseek.com", "deepseek-chat")
+                self.moteur_id = "deepseek-api"
+                return True, "UNION IA · DeepSeek"
+            if self._llama_cpp_disponible() and _MODELE_DEEPSEEK_LOCAL.exists():
+                self._moteur = _MoteurLocal(_MODELE_DEEPSEEK_LOCAL)
+                self.moteur_id = "deepseek-local"
+                return True, "UNION IA · DeepSeek local"
+            return False, "DeepSeek indisponible (ni clé API ni modèle local)"
 
-        if modele in ("gemini", "gemini-api"):
+        if moteur in ("gemini", "gemini-api"):
             cle = os.environ.get("GEMINI_API_KEY", "")
             if cle and not cle.startswith("AIzaSy_REMPLACE"):
-                try:
-                    self._backend = _BackendGemini(cle)
-                    self.modele_actif = "gemini-api"
-                    self.historique.clear()
-                    return True, "UNION IA (Gemini API)"
-                except Exception as e:
-                    return False, str(e)
-            return False, "Gemini non disponible (clé GEMINI_API_KEY absente)"
+                self._moteur = _MoteurGemini(cle)
+                self.moteur_id = "gemini-api"
+                return True, "UNION IA · Gemini"
+            return False, "Gemini indisponible (clé GEMINI_API_KEY absente)"
 
-        if modele in ("kimi", "kimi-local"):
-            if _MODELE_KIMI_LOCAL.exists():
-                try:
-                    self._backend = _BackendLocal(_MODELE_KIMI_LOCAL, "kimi")
-                    self.modele_actif = "kimi-local"
-                    self.historique.clear()
-                    return True, "UNION IA (local Kimi)"
-                except Exception as e:
-                    return False, str(e)
-            return False, "Kimi non disponible (fichier GGUF introuvable)"
+        if moteur in ("kimi", "kimi-local"):
+            if self._llama_cpp_disponible() and _MODELE_KIMI_LOCAL.exists():
+                self._moteur = _MoteurLocal(_MODELE_KIMI_LOCAL)
+                self.moteur_id = "kimi-local"
+                return True, "UNION IA · Kimi local"
+            return False, "Kimi indisponible (llama-cpp ou fichier GGUF manquant)"
 
-        return False, f"Modèle inconnu : {modele}"
+        return False, f"Moteur inconnu : {moteur}"
+
+    def changer_mode(self, mode: str) -> tuple[bool, str]:
+        if mode not in MODES:
+            return False, f"Mode inconnu : {mode}"
+        self.mode = mode
+        return True, MODES[mode]["label"]
+
+    # ── Génération ───────────────────────────────────────────────────────────
+
+    def _systeme(self) -> str:
+        contexte = None
+        if callable(self.fournir_memoire):
+            try:
+                contexte = self.fournir_memoire()
+            except Exception:
+                contexte = None
+        return construire_systeme(self.nom_utilisateur, contexte, MODES[self.mode]["hint"])
 
     def repondre(self, message: str, nom_utilisateur: str | None = None) -> str | None:
-        if not self._backend:
+        if not self._moteur:
             return None
-        rep = self._backend.repondre(message, self.historique, nom_utilisateur)
+        if nom_utilisateur is not None:
+            self.nom_utilisateur = nom_utilisateur
+        rep = self._moteur.completer(
+            self._systeme(), self.historique, message, MODES[self.mode]
+        )
         if rep:
             self.historique.append({"user": message, "assistant": rep})
         return rep
 
     def repondre_stream(self, message: str, nom_utilisateur: str | None = None):
-        if not self._backend:
-            yield ("erreur", "Aucun backend LLM disponible — configure DEEPSEEK_API_KEY dans .env")
+        if not self._moteur:
+            yield ("erreur", "Aucun moteur LLM disponible — configure DEEPSEEK_API_KEY dans .env")
             return
-        reponse_complete = ""
-        for phase, contenu in self._backend.repondre_stream(message, self.historique, nom_utilisateur):
-            yield (phase, contenu)
-            if phase == "repondre":
-                reponse_complete += contenu
-            elif phase == "done":
-                texte_final = contenu or reponse_complete.strip()
-                if texte_final:
-                    self.historique.append({"user": message, "assistant": texte_final})
-                return
+        if nom_utilisateur is not None:
+            self.nom_utilisateur = nom_utilisateur
+
+        systeme = self._systeme()
+        params = MODES[self.mode]
+
+        try:
+            deltas = self._moteur.stream_deltas(systeme, self.historique, message, params)
+            reponse_complete = ""
+            for phase, contenu in _parser_think(deltas):
+                if phase == "done":
+                    texte_final = contenu or reponse_complete.strip()
+                    if texte_final:
+                        self.historique.append({"user": message, "assistant": texte_final})
+                    yield ("done", texte_final)
+                    return
+                if phase == "repondre":
+                    reponse_complete += contenu
+                yield (phase, contenu)
+        except Exception as e:
+            yield ("erreur", str(e))
+
+    # ── Divers ───────────────────────────────────────────────────────────────
 
     def vider_historique(self):
         self.historique.clear()
 
+    def charger_historique(self, messages: list[dict]):
+        """Restaure l'historique LLM depuis une liste {user, assistant}."""
+        self.historique = list(messages)
+
+    @property
+    def modele_actif(self) -> str | None:
+        """Compat : identifiant du moteur courant."""
+        return self.moteur_id
+
     def stats(self) -> dict:
         noms = {
-            "deepseek-api":   "UNION IA · DeepSeek API",
-            "gemini-api":     "UNION IA · Gemini API",
+            "deepseek-api":   "UNION IA · DeepSeek",
+            "gemini-api":     "UNION IA · Gemini",
             "deepseek-local": "UNION IA · DeepSeek local",
             "kimi-local":     "UNION IA · Kimi local",
         }
         return {
-            "modele": noms.get(self.modele_actif or "", "non chargé"),
+            "modele": noms.get(self.moteur_id or "", "non chargé"),
+            "mode": self.mode,
+            "mode_label": MODES[self.mode]["label"],
             "echanges": len(self.historique),
-            "gpu_couches": 16 if "local" in (self.modele_actif or "") else 0,
-            "backend": self.modele_actif or "aucun",
+            "gpu_couches": 16 if "local" in (self.moteur_id or "") else 0,
+            "backend": self.moteur_id or "aucun",
         }
 
     @property
     def actif(self) -> bool:
-        return self._backend is not None
+        return self._moteur is not None
+
+    def desactiver(self):
+        """Désactive le moteur courant (ex : après un échec de chargement)."""
+        self._moteur = None
+        self.moteur_id = None
 
     @staticmethod
     def _llama_cpp_disponible() -> bool:
         try:
-            import importlib.util
             return importlib.util.find_spec("llama_cpp") is not None
         except Exception:
             return False
