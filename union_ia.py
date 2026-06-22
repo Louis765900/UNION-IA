@@ -86,10 +86,9 @@ def main():
 
         # Chemin streaming : LLM actif + requête de connaissance
         if cerveau.llm.actif and cerveau.besoin_llm(texte):
-            source = "llm" if cerveau.llm.modele_actif == "deepseek" else "kimi"
             reponse = afficher_reponse_stream(
                 cerveau.llm.repondre_stream(texte_llm, nom_utilisateur=cerveau.nom_utilisateur),
-                source=source,
+                source="llm",
             )
             if reponse:
                 cerveau.enregistrer_echange_llm(texte, reponse)

@@ -109,8 +109,7 @@ def afficher_entrainement_ok():
 def _label_source(source: str) -> str:
     return {
         "ia":  f"[bold {COULEURS['accent']}]UNION IA[/]",
-        "llm": f"[bold {COULEURS['accent']}]UNION IA[/] [dim](DeepSeek R1)[/]",
-        "kimi": f"[bold {COULEURS['accent']}]UNION IA[/] [dim](Kimi K2)[/]",
+        "llm": f"[bold {COULEURS['accent']}]UNION IA[/]",
         "sys": f"[{COULEURS['avertissement']}]Système[/]",
     }.get(source, f"[bold {COULEURS['accent']}]UNION IA[/]")
 
