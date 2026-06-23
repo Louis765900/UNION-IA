@@ -48,6 +48,10 @@ MODES = {
 }
 MODE_DEFAUT = "2.1"
 
+# Cache du test d'import llama_cpp (None = pas encore testé).
+# Évite de réimporter une DLL potentiellement cassée à chaque appel.
+_LLAMA_OK: bool | None = None
+
 
 def _charger_env():
     """Charge les variables depuis .env (racine) puis scripts/.env (fallback).
@@ -279,7 +283,15 @@ class _MoteurLocal:
 
     def _get_llm(self):
         if self._llm is None:
-            from llama_cpp import Llama
+            try:
+                from llama_cpp import Llama
+            except Exception:
+                # DLL llama.cpp injoignable (dépendance manquante sous Windows…)
+                raise RuntimeError(
+                    "Le moteur local n'a pas pu démarrer (llama.cpp indisponible). "
+                    "Utilise un moteur cloud (DeepSeek/Gemini) ou réinstalle "
+                    "llama-cpp-python."
+                )
             self._llm = Llama(
                 model_path=str(self._chemin),
                 n_ctx=8192,
@@ -503,10 +515,23 @@ class LLMCerveau:
 
     @staticmethod
     def _llama_cpp_disponible() -> bool:
-        try:
-            return importlib.util.find_spec("llama_cpp") is not None
-        except Exception:
-            return False
+        """Vérifie que llama_cpp est non seulement installé mais réellement
+        *importable*. Sur Windows, le package peut être présent alors que
+        `llama.dll` échoue à charger (dépendance manquante) : `find_spec` ne le
+        détecte pas, un vrai import oui. Résultat mis en cache."""
+        global _LLAMA_OK
+        if _LLAMA_OK is None:
+            try:
+                # Le spec doit exister ET l'import doit réussir (charge la DLL)
+                if importlib.util.find_spec("llama_cpp") is None:
+                    _LLAMA_OK = False
+                else:
+                    import llama_cpp  # noqa: F401 — déclenche le chargement DLL
+                    _LLAMA_OK = True
+            except Exception:
+                # DLL introuvable, dépendance manquante, etc. → local indisponible
+                _LLAMA_OK = False
+        return _LLAMA_OK
 
     @staticmethod
     def modeles_disponibles() -> dict[str, bool]:

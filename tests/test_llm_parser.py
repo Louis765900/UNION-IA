@@ -66,6 +66,24 @@ def test_construire_systeme_minimal():
     assert "UNION IA" in s
 
 
+def test_moteur_local_erreur_propre():
+    """Sans llama_cpp fonctionnel, le moteur local doit échouer avec un message
+    clair (et surtout pas laisser remonter l'erreur brute de la DLL)."""
+    from cerveau.llm_cerveau import _MoteurLocal, LLMCerveau
+    from pathlib import Path
+    # llama_cpp absent/cassé dans l'environnement de test
+    if LLMCerveau._llama_cpp_disponible():
+        return  # environnement où le local marche → rien à vérifier
+    moteur = _MoteurLocal(Path("/inexistant/modele.gguf"))
+    # completer/stream_deltas avalent l'exception ; _get_llm la lève proprement
+    try:
+        moteur._get_llm()
+        assert False, "Devrait lever une erreur"
+    except RuntimeError as e:
+        assert "local" in str(e).lower()
+        assert "llama.dll" not in str(e)  # pas d'erreur technique brute
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
