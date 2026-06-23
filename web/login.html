@@ -36,8 +36,15 @@
   input:focus { outline: none; border-color: var(--accent); }
   button[type=submit] { width: 100%; padding: .75rem; background: var(--accent);
                         color: #fff; border: none; border-radius: 8px; font-size: 1rem;
-                        font-weight: 600; cursor: pointer; transition: background .2s; }
+                        font-weight: 600; cursor: pointer; transition: background .2s, opacity .2s; }
   button[type=submit]:hover { background: var(--accent-hover); }
+  button[type=submit]:disabled { opacity: .6; cursor: not-allowed; }
+  .pw-hint { font-size: .78rem; color: var(--muted); margin-top: -.6rem; margin-bottom: .8rem; }
+  .pw-hint.ok { color: var(--success); }
+  .pw-hint.err { color: var(--danger); }
+  .home-link { text-align:center; margin-top:1.2rem; font-size:.85rem; color:var(--muted); }
+  .home-link a { color:var(--accent); text-decoration:none; }
+  .home-link a:hover { text-decoration:underline; }
   .msg { padding: .6rem .9rem; border-radius: 8px; font-size: .9rem; margin-bottom: 1rem; display: none; }
   .msg.err { background: rgba(238,85,85,.12); color: var(--danger); border: 1px solid rgba(238,85,85,.3); }
   .msg.ok { background: rgba(68,204,153,.12); color: var(--success); border: 1px solid rgba(68,204,153,.3); }
@@ -66,7 +73,7 @@
     <input type="email" id="login-email" placeholder="toi@exemple.com" required autocomplete="email">
     <label>Mot de passe</label>
     <input type="password" id="login-mdp" placeholder="••••••" required autocomplete="current-password">
-    <button type="submit">Se connecter</button>
+    <button type="submit" id="btn-login">Se connecter</button>
   </form>
 
   <form id="form-register" style="display:none">
@@ -75,9 +82,12 @@
     <label>Email</label>
     <input type="email" id="reg-email" placeholder="toi@exemple.com" required autocomplete="email">
     <label>Mot de passe</label>
-    <input type="password" id="reg-mdp" placeholder="6 caractères minimum" required autocomplete="new-password">
-    <button type="submit">Créer le compte</button>
+    <input type="password" id="reg-mdp" placeholder="8 caractères minimum" required
+      autocomplete="new-password" oninput="validerMdp(this.value)">
+    <div class="pw-hint" id="pw-hint"></div>
+    <button type="submit" id="btn-register">Créer le compte</button>
   </form>
+  <div class="home-link"><a href="/">← Retour au chat</a></div>
 </div>
 
 <script>
@@ -102,8 +112,29 @@ function cacherMsg() {
   document.getElementById('msg').style.display = 'none';
 }
 
+function validerMdp(val) {
+  const hint = document.getElementById('pw-hint');
+  const btn = document.getElementById('btn-register');
+  if (!val) { hint.textContent = ''; hint.className = 'pw-hint'; return; }
+  if (val.length < 8) {
+    hint.textContent = `${val.length}/8 caractères minimum`;
+    hint.className = 'pw-hint err';
+    btn.disabled = true;
+  } else {
+    hint.textContent = '✓ Mot de passe valide';
+    hint.className = 'pw-hint ok';
+    btn.disabled = false;
+  }
+}
+
+function setBtnLoading(id, loading, label) {
+  const btn = document.getElementById(id);
+  if (btn) { btn.disabled = loading; btn.textContent = loading ? 'Chargement…' : label; }
+}
+
 document.getElementById('form-login').addEventListener('submit', async e => {
   e.preventDefault();
+  setBtnLoading('btn-login', true, 'Se connecter');
   const email = document.getElementById('login-email').value;
   const mdp = document.getElementById('login-mdp').value;
   const r = await fetch('/api/auth/login', {
@@ -117,6 +148,7 @@ document.getElementById('form-login').addEventListener('submit', async e => {
     if (data.token) localStorage.setItem('union_token', data.token);
     window.location.href = '/';
   } else {
+    setBtnLoading('btn-login', false, 'Se connecter');
     afficherMsg(data.error || 'Erreur de connexion', 'err');
   }
 });

@@ -71,7 +71,13 @@
   </div>
 
   <div class="section">
-    <h2>Utilisateurs</h2>
+    <h2 style="display:flex;align-items:center;justify-content:space-between">
+      Utilisateurs
+      <input id="search-users" type="search" placeholder="Filtrer par email ou nom…"
+        oninput="filtrerUtilisateurs(this.value)"
+        style="font-size:.85rem;padding:.35rem .7rem;background:var(--surface2);border:1px solid var(--border);
+               border-radius:6px;color:var(--text);width:240px;outline:none">
+    </h2>
     <table>
       <thead><tr><th>ID</th><th>Email</th><th>Nom</th><th>Rôle</th><th>Créé le</th><th>Dernière connexion</th><th>Actions</th></tr></thead>
       <tbody id="tbody-users"><tr><td colspan="7" style="color:var(--muted);text-align:center">Chargement…</td></tr></tbody>
@@ -113,7 +119,27 @@ async function chargerUtilisateurs() {
     tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center">Aucun utilisateur</td></tr>';
     return;
   }
-  tbody.innerHTML = data.utilisateurs.map(u => `
+  _tousUtilisateurs = data.utilisateurs;
+  afficherUtilisateurs(tbody, _tousUtilisateurs);
+}
+
+let _tousUtilisateurs = [];
+
+function filtrerUtilisateurs(q) {
+  const tbody = document.getElementById('tbody-users');
+  const filtre = q.toLowerCase();
+  const liste = filtre
+    ? _tousUtilisateurs.filter(u => u.email.includes(filtre) || (u.nom||'').toLowerCase().includes(filtre))
+    : _tousUtilisateurs;
+  afficherUtilisateurs(tbody, liste);
+}
+
+function afficherUtilisateurs(tbody, liste) {
+  if (!liste.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center">Aucun résultat</td></tr>';
+    return;
+  }
+  tbody.innerHTML = liste.map(u => `
     <tr>
       <td>${u.id}</td>
       <td>${escHtml(u.email)}</td>
