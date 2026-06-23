@@ -195,6 +195,28 @@ class Auth:
             )
             self._conn.commit()
 
+    def changer_mot_de_passe(self, user_id: int, ancien: str, nouveau: str):
+        """Vérifie l'ancien mot de passe et remplace par le nouveau."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT sel, hash_mdp FROM utilisateurs WHERE id = ?", (user_id,)
+            ).fetchone()
+        if not row:
+            raise ValueError("Utilisateur introuvable")
+        if not _verifier_mdp(ancien, row["sel"], row["hash_mdp"]):
+            raise ValueError("Mot de passe actuel incorrect")
+        if len(nouveau) < 8:
+            raise ValueError("Le nouveau mot de passe doit faire au moins 8 caractères")
+        sel, h = _hasher(nouveau)
+        with self._lock:
+            self._conn.execute(
+                "UPDATE utilisateurs SET sel = ?, hash_mdp = ? WHERE id = ?",
+                (sel, h, user_id),
+            )
+            # Invalide toutes les sessions existantes (force reconnexion)
+            self._conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            self._conn.commit()
+
     def nettoyer_sessions_expirees(self):
         with self._lock:
             self._conn.execute(

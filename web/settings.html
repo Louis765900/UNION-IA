@@ -422,6 +422,29 @@ main {
       </div>
     </div>
 
+    <!-- Compte -->
+    <div class="section" id="section-compte" style="display:none">
+      <div class="section-head"><span class="msym">manage_accounts</span>Mon compte</div>
+      <div class="section-body">
+        <div id="compte-info" style="font-size:13px;color:var(--txt-mid);margin-bottom:12px"></div>
+        <div class="section-head" style="background:none;border:none;padding:0;margin-bottom:8px;color:var(--txt-mid);font-size:13px;font-weight:600">
+          Changer le mot de passe
+        </div>
+        <div class="field"><span class="field-label">Mot de passe actuel</span>
+          <input class="field-input" id="mdp-actuel" type="password" placeholder="••••••••"/></div>
+        <div class="two-col">
+          <div class="field"><span class="field-label">Nouveau mot de passe</span>
+            <input class="field-input" id="mdp-nouveau" type="password" placeholder="••••••••"/></div>
+          <div class="field"><span class="field-label">Confirmation</span>
+            <input class="field-input" id="mdp-confirm" type="password" placeholder="••••••••"/></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn" onclick="changerMotDePasse()"><span class="msym" style="font-size:16px">lock_reset</span>Changer</button>
+          <span id="mdp-status" style="font-size:13px"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- Apparence -->
     <div class="section">
       <div class="section-head"><span class="msym">palette</span>Apparence &amp; profil</div>
@@ -709,12 +732,15 @@ async function supprimerSkill(id) {
 const _token = localStorage.getItem('union_token') || '';
 const _authH = _token ? { 'Authorization': 'Bearer ' + _token } : {};
 
+let _userCourant = null;
+
 async function chargerAuth() {
   try {
     const r = await fetch('/api/auth/me', { headers: _authH, credentials: 'include' });
     if (!r.ok) return;
     const d = await r.json();
     if (d.authentifie && d.user) {
+      _userCourant = d.user;
       const nom = d.user.nom || d.user.email;
       document.getElementById('nav-name').textContent = nom;
       document.getElementById('nav-initial').textContent = nom[0].toUpperCase();
@@ -723,8 +749,43 @@ async function chargerAuth() {
       if (d.user.role === 'admin') {
         document.getElementById('admin-nav-link').style.display = '';
       }
+      // Affiche la section compte
+      const sec = document.getElementById('section-compte');
+      if (sec) {
+        sec.style.display = '';
+        document.getElementById('compte-info').textContent =
+          `Connecté en tant que ${d.user.email} · Rôle : ${d.user.role}`;
+      }
     }
   } catch {}
+}
+
+async function changerMotDePasse() {
+  const actuel = document.getElementById('mdp-actuel').value;
+  const nouveau = document.getElementById('mdp-nouveau').value;
+  const confirm = document.getElementById('mdp-confirm').value;
+  const st = document.getElementById('mdp-status');
+  if (!actuel || !nouveau) { st.textContent = 'Remplis tous les champs.'; st.style.color = 'var(--err)'; return; }
+  if (nouveau !== confirm) { st.textContent = 'Les mots de passe ne correspondent pas.'; st.style.color = 'var(--err)'; return; }
+  try {
+    const r = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ..._authH },
+      credentials: 'include',
+      body: JSON.stringify({ ancien: actuel, nouveau }),
+    });
+    const d = await r.json();
+    if (d.success) {
+      st.textContent = '✓ Mot de passe modifié.';
+      st.style.color = 'var(--ok)';
+      document.getElementById('mdp-actuel').value = '';
+      document.getElementById('mdp-nouveau').value = '';
+      document.getElementById('mdp-confirm').value = '';
+    } else {
+      st.textContent = '✗ ' + (d.error || 'Erreur');
+      st.style.color = 'var(--err)';
+    }
+  } catch { st.textContent = 'Erreur réseau.'; st.style.color = 'var(--err)'; }
 }
 
 async function seDeconnecter() {

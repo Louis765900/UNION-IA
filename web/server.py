@@ -15,6 +15,8 @@ import sys
 import threading
 import tempfile
 import os
+import time
+from collections import defaultdict
 from pathlib import Path
 from functools import wraps
 
@@ -69,6 +71,29 @@ def _initialiser():
 
 
 threading.Thread(target=_initialiser, daemon=True).start()
+
+
+# ── Rate limiting simple ───────────────────────────────────────────────────────
+
+_rl_hits: dict[str, list[float]] = defaultdict(list)
+_rl_lock = threading.Lock()
+
+def _rate_limit(max_calls: int = 10, window: int = 60):
+    """Limite les tentatives par IP (utile pour les routes auth)."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            ip = request.remote_addr or "unknown"
+            now = time.time()
+            with _rl_lock:
+                hits = [t for t in _rl_hits[ip] if now - t < window]
+                if len(hits) >= max_calls:
+                    return jsonify({"error": "Trop de tentatives, réessaie dans une minute."}), 429
+                hits.append(now)
+                _rl_hits[ip] = hits
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ── Auth helpers ───────────────────────────────────────────────────────────────
@@ -311,6 +336,35 @@ def api_conversation_renommer(conv_id):
     return jsonify({"success": True})
 
 
+@app.route("/api/conversations/<int:conv_id>/export")
+def api_conversation_exporter(conv_id):
+    _attendre_init()
+    if not _cerveau.stockage.conversation_existe(conv_id):
+        return jsonify({"error": "Conversation introuvable"}), 404
+    fmt = request.args.get("format", "json")
+    messages = _cerveau.stockage.lister_messages(conv_id)
+    if fmt == "txt":
+        lignes = []
+        for m in messages:
+            role = "Toi" if m["role"] == "user" else "UNION IA"
+            lignes.append(f"[{role}]\n{m['contenu']}\n")
+        texte = "\n".join(lignes)
+        return Response(
+            texte, mimetype="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename=conversation_{conv_id}.txt"},
+        )
+    # JSON par défaut
+    payload = json.dumps({
+        "id": conv_id,
+        "exporte_le": int(time.time()),
+        "messages": messages,
+    }, ensure_ascii=False, indent=2)
+    return Response(
+        payload, mimetype="application/json",
+        headers={"Content-Disposition": f"attachment; filename=conversation_{conv_id}.json"},
+    )
+
+
 @app.route("/api/search")
 def api_search():
     _attendre_init()
@@ -422,6 +476,7 @@ def page_login():
 
 
 @app.route("/api/auth/register", methods=["POST"])
+@_rate_limit(max_calls=5, window=300)
 def api_register():
     data = request.get_json(force=True, silent=True) or {}
     email = (data.get("email") or "").strip()
@@ -438,6 +493,7 @@ def api_register():
 
 
 @app.route("/api/auth/login", methods=["POST"])
+@_rate_limit(max_calls=10, window=60)
 def api_login():
     data = request.get_json(force=True, silent=True) or {}
     email = (data.get("email") or "").strip()
@@ -467,6 +523,25 @@ def api_me():
     if not u:
         return jsonify({"authentifie": False}), 401
     return jsonify({"authentifie": True, "user": u})
+
+
+@app.route("/api/auth/change-password", methods=["POST"])
+@auth_requis
+@_rate_limit(max_calls=5, window=300)
+def api_change_password():
+    u = _utilisateur_courant()
+    data = request.get_json(force=True, silent=True) or {}
+    ancien = (data.get("ancien") or "").strip()
+    nouveau = (data.get("nouveau") or "").strip()
+    if not ancien or not nouveau:
+        return jsonify({"error": "Champs requis"}), 400
+    if len(nouveau) < 8:
+        return jsonify({"error": "Le nouveau mot de passe doit faire au moins 8 caractères"}), 400
+    try:
+        _auth.changer_mot_de_passe(u["id"], ancien, nouveau)
+        return jsonify({"success": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 
 # ── Upload & skills (fichiers binaires) ────────────────────────────────────────

@@ -100,3 +100,19 @@ def test_supprimer_utilisateur():
     a.supprimer_utilisateur(u['id'])
     users = a.lister_utilisateurs()
     assert not any(x['email'] == 'sup@test.fr' for x in users)
+
+def test_changer_mot_de_passe():
+    a = _auth()
+    u = a.creer_compte('mdp@test.fr', 'motdepasse1', 'MDP')
+    a.changer_mot_de_passe(u['id'], 'motdepasse1', 'nouveaumdp2')
+    assert a.connecter('mdp@test.fr', 'motdepasse1') is None
+    assert a.connecter('mdp@test.fr', 'nouveaumdp2') is not None
+
+def test_changer_mdp_mauvais_ancien():
+    a = _auth()
+    u = a.creer_compte('mdp2@test.fr', 'motdepasse1', 'MDP2')
+    try:
+        a.changer_mot_de_passe(u['id'], 'mauvais', 'nouveaumdp2')
+        assert False, "Devrait lever ValueError"
+    except ValueError as e:
+        assert 'incorrect' in str(e).lower()
