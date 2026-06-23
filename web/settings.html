@@ -326,13 +326,17 @@ main {
       <div class="nav-section">Navigation</div>
       <a href="/" class="nav-item"><span class="msym" style="font-size:18px">chat</span>Conversations</a>
       <a href="/settings" class="nav-item active"><span class="msym" style="font-size:18px;font-variation-settings:'FILL' 1,'wght' 400">settings</span>Paramètres</a>
+      <a href="/admin" class="nav-item" id="admin-nav-link" style="display:none"><span class="msym" style="font-size:18px">admin_panel_settings</span>Administration</a>
     </div>
     <div class="nav-footer">
-      <div class="nav-avatar" id="nav-initial">L</div>
-      <div>
-        <div style="font-size:14px;font-weight:500;color:var(--txt)" id="nav-name">Louis</div>
-        <div class="jb" style="font-size:10px;color:var(--txt-dim)">Instance locale</div>
+      <div class="nav-avatar" id="nav-initial">U</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="nav-name">UNION IA</div>
+        <div class="jb" style="font-size:10px;color:var(--txt-dim)" id="nav-role">Instance locale</div>
       </div>
+      <button onclick="seDeconnecter()" id="nav-logout" title="Déconnexion" style="display:none;background:none;border:none;color:var(--txt-dim);cursor:pointer;padding:4px">
+        <span class="msym" style="font-size:18px">logout</span>
+      </button>
     </div>
   </nav>
 
@@ -701,11 +705,40 @@ async function supprimerSkill(id) {
   loadSkills();
 }
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const _token = localStorage.getItem('union_token') || '';
+const _authH = _token ? { 'Authorization': 'Bearer ' + _token } : {};
+
+async function chargerAuth() {
+  try {
+    const r = await fetch('/api/auth/me', { headers: _authH, credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.authentifie && d.user) {
+      const nom = d.user.nom || d.user.email;
+      document.getElementById('nav-name').textContent = nom;
+      document.getElementById('nav-initial').textContent = nom[0].toUpperCase();
+      document.getElementById('nav-role').textContent = d.user.role === 'admin' ? 'Administrateur' : 'Utilisateur';
+      document.getElementById('nav-logout').style.display = '';
+      if (d.user.role === 'admin') {
+        document.getElementById('admin-nav-link').style.display = '';
+      }
+    }
+  } catch {}
+}
+
+async function seDeconnecter() {
+  await fetch('/api/auth/logout', { method: 'POST', headers: _authH, credentials: 'include' });
+  localStorage.removeItem('union_token');
+  window.location.href = '/login';
+}
+
 loadStatus();
 loadEngines();
 loadModes();
 loadMemory();
 loadSkills();
+chargerAuth();
 </script>
 </body>
 </html>

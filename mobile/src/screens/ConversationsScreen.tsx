@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   SafeAreaView, RefreshControl,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { apiGet, apiPost } from '../api/client';
 import { COLORS, RADIUS } from '../theme';
 

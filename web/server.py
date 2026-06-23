@@ -13,10 +13,12 @@ un démarrage instantané.
 import json
 import sys
 import threading
+import tempfile
+import os
 from pathlib import Path
 from functools import wraps
 
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, jsonify, send_from_directory
 
 WEB_DIR = Path(__file__).parent
 BASE_DIR = WEB_DIR.parent
@@ -31,6 +33,22 @@ app = Flask(__name__)
 _llm_lock = threading.Lock()
 _init_done = threading.Event()
 _auth = Auth()
+
+# CORS pour l'app mobile et l'extension VS Code
+_CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
+
+@app.after_request
+def add_cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = _CORS_ORIGINS
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Credentials"] = "true"
+    return resp
+
+@app.route("/", defaults={"path": ""}, methods=["OPTIONS"])
+@app.route("/<path:path>", methods=["OPTIONS"])
+def options_handler(path=""):
+    return jsonify({}), 200
 
 _cerveau: Cerveau | None = None
 # Conversation active côté serveur (l'historique LLM lui est lié)
@@ -191,7 +209,7 @@ def api_chat():
     def generate():
         yield f"data: {json.dumps({'phase': 'conversation', 'content': conv_id})}\n\n"
         if fichiers:
-            yield f"data: {json.dumps({'phase': 'fichiers', 'content': fichiers})}\n\n"
+            yield f"data: {json.dumps({'phase': 'fichiers', 'content': fichiers, 'nb': len(fichiers)})}\n\n"
 
         if _cerveau.llm.actif and _cerveau.besoin_llm(message):
             yield f"data: {json.dumps({'phase': 'source', 'content': _cerveau.llm.moteur_id or 'llm'})}\n\n"
@@ -449,6 +467,50 @@ def api_me():
     if not u:
         return jsonify({"authentifie": False}), 401
     return jsonify({"authentifie": True, "user": u})
+
+
+# ── Upload & skills (fichiers binaires) ────────────────────────────────────────
+
+@app.route("/api/upload", methods=["POST"])
+def api_upload():
+    """
+    Reçoit un fichier multipart, le traite via les skills et retourne
+    le texte extrait prêt à être injecté dans un message.
+    """
+    _attendre_init()
+    if "fichier" not in request.files:
+        return jsonify({"error": "Pas de fichier dans la requête"}), 400
+
+    f = request.files["fichier"]
+    nom = f.filename or "fichier"
+    suffix = Path(nom).suffix or ".bin"
+
+    # Sauvegarde temporaire
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        f.save(tmp.name)
+        chemin = Path(tmp.name)
+
+    try:
+        md = _cerveau.skills.traiter_fichier(chemin)
+        if md is not None:
+            # Remplace le nom temporaire par le nom original du fichier
+            md = md.replace(chemin.name, nom, 1)
+            return jsonify({
+                "succes": True,
+                "nom": nom,
+                "contenu": md,
+                "skill": True,
+            })
+        # Fallback : tente lecture texte brute
+        try:
+            texte = chemin.read_text(encoding="utf-8", errors="replace")
+            ext = suffix.lstrip(".")
+            md = f"\n\n**Fichier `{nom}` :**\n```{ext}\n{texte[:12000]}\n```\n"
+            return jsonify({"succes": True, "nom": nom, "contenu": md, "skill": False})
+        except Exception:
+            return jsonify({"error": f"Aucun skill disponible pour {suffix}"}), 415
+    finally:
+        chemin.unlink(missing_ok=True)
 
 
 # ── Skills ─────────────────────────────────────────────────────────────────────
