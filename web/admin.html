@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UNION IA — Admin</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222; --border: #2a2a2a;
+    --text: #e8e8e8; --muted: #888; --accent: #7c6ff7; --danger: #e55; --success: #4c9;
+    --radius: 10px;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f5f5; --surface: #fff; --surface2: #f0f0f0; --border: #e0e0e0;
+    --text: #1a1a1a; --muted: #666;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui,sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 1.2rem; font-weight: 700; }
+  header nav a { color: var(--muted); text-decoration: none; margin-left: 1.5rem; font-size: .9rem; }
+  header nav a:hover { color: var(--text); }
+  .container { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 1.2rem; text-align: center; }
+  .stat-val { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .stat-lbl { font-size: .8rem; color: var(--muted); margin-top: .2rem; }
+  h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface);
+          border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  th { background: var(--surface2); padding: .8rem 1rem; text-align: left; font-size: .85rem;
+       color: var(--muted); border-bottom: 1px solid var(--border); }
+  td { padding: .75rem 1rem; border-bottom: 1px solid var(--border); font-size: .9rem; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: .2rem .5rem; border-radius: 4px; font-size: .78rem; font-weight: 600; }
+  .badge-admin { background: rgba(124,111,247,.2); color: var(--accent); }
+  .badge-user { background: rgba(100,100,100,.2); color: var(--muted); }
+  .btn { padding: .35rem .7rem; border-radius: 6px; border: none; cursor: pointer; font-size: .82rem; }
+  .btn-danger { background: rgba(238,85,85,.15); color: var(--danger); border: 1px solid rgba(238,85,85,.3); }
+  .btn-danger:hover { background: rgba(238,85,85,.3); }
+  .btn-muted { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-logout { background: var(--surface); border: 1px solid var(--border); color: var(--text);
+                padding: .4rem .8rem; border-radius: 8px; cursor: pointer; }
+  .section { background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.5rem; }
+  #msg-admin { padding: .6rem 1rem; border-radius: 8px; margin-bottom: 1rem; display: none; font-size: .9rem; }
+  .msg-err { background: rgba(238,85,85,.12); color: var(--danger); border: 1px solid rgba(238,85,85,.3); }
+  .msg-ok { background: rgba(68,204,153,.12); color: var(--success); border: 1px solid rgba(68,204,153,.3); }
+</style>
+</head>
+<body>
+<header>
+  <h1>UNION IA — Administration</h1>
+  <nav>
+    <a href="/">Chat</a>
+    <a href="/settings">Paramètres</a>
+    <button class="btn-logout" onclick="seDeconnecter()">Déconnexion</button>
+  </nav>
+</header>
+
+<div class="container">
+  <div id="msg-admin"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-val" id="s-users">…</div><div class="stat-lbl">Utilisateurs</div></div>
+    <div class="stat"><div class="stat-val" id="s-convs">…</div><div class="stat-lbl">Conversations</div></div>
+    <div class="stat"><div class="stat-val" id="s-faits">…</div><div class="stat-lbl">Faits mémorisés</div></div>
+    <div class="stat"><div class="stat-val" id="s-model" style="font-size:1rem;padding-top:.4rem">…</div><div class="stat-lbl">Moteur actif</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Utilisateurs</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Email</th><th>Nom</th><th>Rôle</th><th>Créé le</th><th>Dernière connexion</th><th>Actions</th></tr></thead>
+      <tbody id="tbody-users"><tr><td colspan="7" style="color:var(--muted);text-align:center">Chargement…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('union_token') || '';
+const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+
+function msg(texte, type) {
+  const el = document.getElementById('msg-admin');
+  el.textContent = texte;
+  el.className = 'msg-' + type;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+async function chargerStats() {
+  try {
+    const r = await fetch('/api/admin/stats', {headers, credentials: 'include'});
+    if (r.status === 401) { window.location.href = '/login'; return; }
+    if (r.status === 403) { document.body.innerHTML = '<div style="padding:3rem;text-align:center;color:var(--danger)">Accès réservé aux administrateurs.</div>'; return; }
+    const d = await r.json();
+    document.getElementById('s-users').textContent = d.utilisateurs;
+    document.getElementById('s-convs').textContent = d.conversations;
+    document.getElementById('s-faits').textContent = d.faits;
+    document.getElementById('s-model').textContent = d.modele;
+  } catch(e) {}
+}
+
+async function chargerUtilisateurs() {
+  const r = await fetch('/api/admin/utilisateurs', {headers, credentials: 'include'});
+  if (!r.ok) return;
+  const data = await r.json();
+  const tbody = document.getElementById('tbody-users');
+  if (!data.utilisateurs.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center">Aucun utilisateur</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.utilisateurs.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td>${escHtml(u.email)}</td>
+      <td>${escHtml(u.nom || '—')}</td>
+      <td><span class="badge badge-${u.role}">${u.role}</span></td>
+      <td>${u.cree_le ? new Date(u.cree_le*1000).toLocaleDateString('fr') : '—'}</td>
+      <td>${u.connexion_le ? new Date(u.connexion_le*1000).toLocaleString('fr') : 'Jamais'}</td>
+      <td>
+        ${u.role === 'admin'
+          ? `<button class="btn btn-muted" onclick="changerRole(${u.id},'user')">→ user</button>`
+          : `<button class="btn btn-muted" onclick="changerRole(${u.id},'admin')">→ admin</button>`}
+        <button class="btn btn-danger" onclick="supprimerUser(${u.id},'${escHtml(u.email)}')" style="margin-left:.4rem">Supprimer</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function supprimerUser(id, email) {
+  if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+  const r = await fetch(`/api/admin/utilisateurs/${id}`, {method:'DELETE', headers, credentials:'include'});
+  if (r.ok) { msg('Utilisateur supprimé', 'ok'); chargerUtilisateurs(); chargerStats(); }
+  else msg('Erreur lors de la suppression', 'err');
+}
+
+async function changerRole(id, role) {
+  const r = await fetch(`/api/admin/utilisateurs/${id}/role`, {
+    method:'POST', headers: {...headers,'Content-Type':'application/json'},
+    body: JSON.stringify({role}), credentials:'include',
+  });
+  if (r.ok) { msg(`Rôle changé → ${role}`, 'ok'); chargerUtilisateurs(); }
+  else msg('Erreur', 'err');
+}
+
+async function seDeconnecter() {
+  await fetch('/api/auth/logout', {method:'POST', headers, credentials:'include'});
+  localStorage.removeItem('union_token');
+  window.location.href = '/login';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+chargerStats();
+chargerUtilisateurs();
+</script>
+</body>
+</html>

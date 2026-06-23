@@ -7,6 +7,7 @@ from typing import Tuple
 from cerveau.llm_cerveau import LLMCerveau
 from cerveau.stockage import Stockage
 from cerveau.memoire_active import extraire_faits, extraire_prenom
+from cerveau.skills.gestionnaire import GestionnaireSkills
 
 BASE_DIR = Path(__file__).parent.parent
 DONNEES_DIR = BASE_DIR / "donnees"
@@ -41,6 +42,7 @@ class Cerveau:
     def __init__(self, entraineur, stockage: Stockage | None = None):
         self.entraineur = entraineur
         self.stockage = stockage or Stockage()
+        self.skills = GestionnaireSkills()
         self.llm = LLMCerveau()
         # Branche la mémoire active sur le LLM (contexte injecté à chaque requête)
         self.llm.fournir_memoire = self._contexte_memoire
@@ -201,9 +203,13 @@ class Cerveau:
 
         def _lire_fichier(token: str, chemin: Path):
             try:
-                contenu = chemin.read_text(encoding="utf-8", errors="replace")
-                ext = chemin.suffix.lstrip(".") or "text"
-                md = f'\n\n**Fichier `{chemin.name}` :**\n```{ext}\n{contenu}\n```\n'
+                # Essaie d'abord les skills (PDF, Excel, Access, Word…)
+                md = self.skills.traiter_fichier(chemin)
+                if md is None:
+                    # Fallback : lecture texte brute
+                    contenu = chemin.read_text(encoding="utf-8", errors="replace")
+                    ext = chemin.suffix.lstrip(".") or "text"
+                    md = f'\n\n**Fichier `{chemin.name}` :**\n```{ext}\n{contenu}\n```\n'
                 injections.append((token, chemin.name, md))
             except Exception:
                 pass

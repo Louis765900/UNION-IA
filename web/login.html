@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UNION IA — Connexion</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --border: #2a2a2a;
+    --text: #e8e8e8; --muted: #888; --accent: #7c6ff7;
+    --accent-hover: #6a5de0; --danger: #e55; --success: #4c9;
+    --radius: 12px; --shadow: 0 4px 24px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f5f5; --surface: #fff; --border: #e0e0e0;
+    --text: #1a1a1a; --muted: #666; --shadow: 0 4px 24px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui,sans-serif; background: var(--bg); color: var(--text);
+         display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 2.5rem; width: 100%; max-width: 400px;
+          box-shadow: var(--shadow); }
+  .logo { text-align: center; margin-bottom: 2rem; }
+  .logo h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.5px; }
+  .logo p { color: var(--muted); font-size: .9rem; margin-top: .25rem; }
+  .tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+  .tab { flex: 1; padding: .6rem; border: 1px solid var(--border); background: transparent;
+         color: var(--muted); border-radius: 8px; cursor: pointer; font-size: .9rem;
+         transition: all .2s; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+  input { width: 100%; padding: .65rem .9rem; background: var(--bg); border: 1px solid var(--border);
+          border-radius: 8px; color: var(--text); font-size: .95rem; margin-bottom: 1rem;
+          transition: border-color .2s; }
+  input:focus { outline: none; border-color: var(--accent); }
+  button[type=submit] { width: 100%; padding: .75rem; background: var(--accent);
+                        color: #fff; border: none; border-radius: 8px; font-size: 1rem;
+                        font-weight: 600; cursor: pointer; transition: background .2s; }
+  button[type=submit]:hover { background: var(--accent-hover); }
+  .msg { padding: .6rem .9rem; border-radius: 8px; font-size: .9rem; margin-bottom: 1rem; display: none; }
+  .msg.err { background: rgba(238,85,85,.12); color: var(--danger); border: 1px solid rgba(238,85,85,.3); }
+  .msg.ok { background: rgba(68,204,153,.12); color: var(--success); border: 1px solid rgba(68,204,153,.3); }
+  .theme-btn { position: fixed; top: 1rem; right: 1rem; background: var(--surface);
+               border: 1px solid var(--border); border-radius: 8px; padding: .4rem .7rem;
+               cursor: pointer; color: var(--text); font-size: 1.1rem; }
+</style>
+</head>
+<body>
+<button class="theme-btn" onclick="toggleTheme()">☀</button>
+<div class="card">
+  <div class="logo">
+    <h1>UNION IA</h1>
+    <p>Ton assistant IA personnel</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="afficherTab('login')">Connexion</button>
+    <button class="tab" onclick="afficherTab('register')">Créer un compte</button>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <form id="form-login">
+    <label>Email</label>
+    <input type="email" id="login-email" placeholder="toi@exemple.com" required autocomplete="email">
+    <label>Mot de passe</label>
+    <input type="password" id="login-mdp" placeholder="••••••" required autocomplete="current-password">
+    <button type="submit">Se connecter</button>
+  </form>
+
+  <form id="form-register" style="display:none">
+    <label>Prénom</label>
+    <input type="text" id="reg-nom" placeholder="Louis" autocomplete="given-name">
+    <label>Email</label>
+    <input type="email" id="reg-email" placeholder="toi@exemple.com" required autocomplete="email">
+    <label>Mot de passe</label>
+    <input type="password" id="reg-mdp" placeholder="6 caractères minimum" required autocomplete="new-password">
+    <button type="submit">Créer le compte</button>
+  </form>
+</div>
+
+<script>
+let tabActif = 'login';
+
+function afficherTab(tab) {
+  tabActif = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.getElementById('form-login').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+  cacherMsg();
+}
+
+function afficherMsg(texte, type) {
+  const el = document.getElementById('msg');
+  el.textContent = texte;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+}
+
+function cacherMsg() {
+  document.getElementById('msg').style.display = 'none';
+}
+
+document.getElementById('form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const mdp = document.getElementById('login-mdp').value;
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email, password: mdp}),
+    credentials: 'include',
+  });
+  const data = await r.json();
+  if (data.success) {
+    if (data.token) localStorage.setItem('union_token', data.token);
+    window.location.href = '/';
+  } else {
+    afficherMsg(data.error || 'Erreur de connexion', 'err');
+  }
+});
+
+document.getElementById('form-register').addEventListener('submit', async e => {
+  e.preventDefault();
+  const nom = document.getElementById('reg-nom').value;
+  const email = document.getElementById('reg-email').value;
+  const mdp = document.getElementById('reg-mdp').value;
+  const r = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email, password: mdp, nom}),
+    credentials: 'include',
+  });
+  const data = await r.json();
+  if (data.success) {
+    afficherMsg('Compte créé ! Connexion en cours…', 'ok');
+    setTimeout(() => window.location.href = '/', 1200);
+  } else {
+    afficherMsg(data.error || 'Erreur lors de la création du compte', 'err');
+  }
+});
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+}
+
+(function() {
+  const t = localStorage.getItem('theme');
+  if (t) document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+</body>
+</html>

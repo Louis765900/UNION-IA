@@ -1,0 +1,114 @@
+{
+  "name": "union-ia",
+  "displayName": "UNION IA",
+  "description": "Ton assistant IA personnel directement dans VS Code",
+  "version": "1.0.0",
+  "publisher": "union-ia",
+  "icon": "media/icon.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["AI", "Other"],
+  "keywords": ["ai", "assistant", "chat", "union-ia"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "unionia.openChat",
+        "title": "UNION IA : Ouvrir le chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "unionia.explainCode",
+        "title": "UNION IA : Expliquer le code sélectionné"
+      },
+      {
+        "command": "unionia.reviewCode",
+        "title": "UNION IA : Revoir le code sélectionné"
+      },
+      {
+        "command": "unionia.generateDoc",
+        "title": "UNION IA : Générer la documentation"
+      },
+      {
+        "command": "unionia.askQuestion",
+        "title": "UNION IA : Poser une question"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "unionia.explainCode",
+          "when": "editorHasSelection",
+          "group": "unionia@1"
+        },
+        {
+          "command": "unionia.reviewCode",
+          "when": "editorHasSelection",
+          "group": "unionia@2"
+        },
+        {
+          "command": "unionia.generateDoc",
+          "when": "editorHasSelection",
+          "group": "unionia@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "unionia.openChat",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "union-ia",
+          "title": "UNION IA",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "union-ia": [
+        {
+          "type": "webview",
+          "id": "unionia.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "UNION IA",
+      "properties": {
+        "unionia.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:5000",
+          "description": "URL du serveur UNION IA"
+        },
+        "unionia.token": {
+          "type": "string",
+          "default": "",
+          "description": "Token d'authentification (optionnel)"
+        },
+        "unionia.mode": {
+          "type": "string",
+          "enum": ["2.1", "flash", "flashlight"],
+          "default": "2.1",
+          "description": "Mode de réponse UNION IA"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

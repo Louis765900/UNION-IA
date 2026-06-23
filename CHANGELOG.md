@@ -1,5 +1,48 @@
 # Journal des nouveautés — UNION IA
 
+## 2.2.0 — Skills, Auth, VS Code, Mobile
+
+### Skills système (PDF, Excel, Access, Word)
+- Nouveau module `cerveau/skills/` : architecture plugin extensible.
+- Skills intégrés : **PDF** (pypdf/pdfplumber), **Excel/CSV** (openpyxl), **Access/SQLite**
+  (pyodbc/sqlite3), **Word** (python-docx/odfpy).
+- Quand tu glisses un fichier dans le chat, UNION IA choisit automatiquement
+  le skill adapté et extrait le contenu pour l'analyser.
+- **Skills personnalisés** : dans *Paramètres → Skills*, tu peux définir
+  ta propre commande (`{fichier}` est remplacé par le chemin) pour n'importe
+  quelle extension.
+
+### Authentification & comptes utilisateurs
+- Nouveau module `cerveau/auth.py` : comptes SQLite, hachage PBKDF2-SHA256,
+  tokens de session (30 jours), compte admin automatique.
+- Nouvelle page `/login` : connexion + création de compte.
+- Nouvelle page `/admin` : liste des utilisateurs, changement de rôle, suppression.
+- Routes API : `POST /api/auth/login`, `POST /api/auth/register`,
+  `POST /api/auth/logout`, `GET /api/auth/me`.
+- Routes admin protégées par décorateur `@admin_requis`.
+
+### Extension VS Code
+- Nouveau dossier `vscode-extension/` (TypeScript + Manifest).
+- Commandes : **Ouvrir le chat**, **Expliquer le code**, **Revoir le code**,
+  **Générer la documentation**, **Poser une question**.
+- Menu contextuel dans l'éditeur (clic droit sur sélection).
+- Panel WebView avec chat SSE natif.
+- Configuration : URL serveur, token, mode.
+
+### Application mobile (Expo React Native)
+- Nouveau dossier `mobile/` : projet Expo avec expo-router.
+- 3 onglets : **Chat** (streaming SSE), **Historique** des conversations,
+  **Paramètres** (URL serveur, connexion, profil).
+- Client API partagé (`src/api/client.ts`) : auth token, streaming.
+
+### Déploiement Vercel
+- `vercel.json` : configuration pour déployer le serveur Flask comme
+  fonction serverless.
+
+### Tests (20 nouveaux → 61 au total)
+- `tests/test_skills.py` : 9 tests (skills CSV, custom, persistance, détection).
+- `tests/test_auth.py` : 11 tests (comptes, hash, tokens, rôles).
+
 ## 2.1.0 — Refonte majeure
 
 ### Le grand changement

@@ -14,6 +14,7 @@ import json
 import sys
 import threading
 from pathlib import Path
+from functools import wraps
 
 from flask import Flask, Response, request, jsonify
 
@@ -24,10 +25,12 @@ sys.path.insert(0, str(BASE_DIR))
 from cerveau.entraineur import Entraineur
 from cerveau.cerveau import Cerveau
 from cerveau.llm_cerveau import LLMCerveau, MODES
+from cerveau.auth import Auth
 
 app = Flask(__name__)
 _llm_lock = threading.Lock()
 _init_done = threading.Event()
+_auth = Auth()
 
 _cerveau: Cerveau | None = None
 # Conversation active côté serveur (l'historique LLM lui est lié)
@@ -48,6 +51,41 @@ def _initialiser():
 
 
 threading.Thread(target=_initialiser, daemon=True).start()
+
+
+# ── Auth helpers ───────────────────────────────────────────────────────────────
+
+def _token_request() -> str | None:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return request.cookies.get("union_token")
+
+
+def _utilisateur_courant() -> dict | None:
+    return _auth.valider_token(_token_request())
+
+
+def auth_requis(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        u = _utilisateur_courant()
+        if not u:
+            return jsonify({"error": "Non authentifié"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def admin_requis(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        u = _utilisateur_courant()
+        if not u:
+            return jsonify({"error": "Non authentifié"}), 401
+        if u.get("role") != "admin":
+            return jsonify({"error": "Accès refusé"}), 403
+        return fn(*args, **kwargs)
+    return wrapper
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -356,6 +394,135 @@ def api_profil():
     if nom:
         _cerveau.nom_utilisateur = nom
     return jsonify({"success": True, "nom": _cerveau.nom_utilisateur})
+
+
+# ── Authentification ───────────────────────────────────────────────────────────
+
+@app.route("/login")
+def page_login():
+    return _serve("login.html")
+
+
+@app.route("/api/auth/register", methods=["POST"])
+def api_register():
+    data = request.get_json(force=True, silent=True) or {}
+    email = (data.get("email") or "").strip()
+    mdp = (data.get("password") or "").strip()
+    nom = (data.get("nom") or "").strip()
+    try:
+        compte = _auth.creer_compte(email, mdp, nom)
+        token = _auth.connecter(email, mdp)
+        resp = jsonify({"success": True, "user": compte})
+        resp.set_cookie("union_token", token, max_age=60*60*24*30, httponly=True, samesite="Lax")
+        return resp
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_login():
+    data = request.get_json(force=True, silent=True) or {}
+    email = (data.get("email") or "").strip()
+    mdp = (data.get("password") or "").strip()
+    token = _auth.connecter(email, mdp)
+    if not token:
+        return jsonify({"error": "Email ou mot de passe incorrect"}), 401
+    u = _auth.valider_token(token)
+    resp = jsonify({"success": True, "token": token, "user": u})
+    resp.set_cookie("union_token", token, max_age=60*60*24*30, httponly=True, samesite="Lax")
+    return resp
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_logout():
+    token = _token_request()
+    if token:
+        _auth.deconnecter(token)
+    resp = jsonify({"success": True})
+    resp.delete_cookie("union_token")
+    return resp
+
+
+@app.route("/api/auth/me")
+def api_me():
+    u = _utilisateur_courant()
+    if not u:
+        return jsonify({"authentifie": False}), 401
+    return jsonify({"authentifie": True, "user": u})
+
+
+# ── Skills ─────────────────────────────────────────────────────────────────────
+
+@app.route("/api/skills")
+def api_skills_lister():
+    _attendre_init()
+    return jsonify({"skills": _cerveau.skills.lister()})
+
+
+@app.route("/api/skills", methods=["POST"])
+def api_skills_ajouter():
+    _attendre_init()
+    data = request.get_json(force=True, silent=True) or {}
+    nom = (data.get("nom") or "").strip()
+    if not nom:
+        return jsonify({"error": "Nom requis"}), 400
+    result = _cerveau.skills.ajouter_custom(data)
+    return jsonify({"success": True, **result})
+
+
+@app.route("/api/skills/<skill_id>", methods=["DELETE"])
+def api_skills_supprimer(skill_id):
+    _attendre_init()
+    ok = _cerveau.skills.supprimer_custom(skill_id)
+    if ok:
+        return jsonify({"success": True})
+    return jsonify({"error": "Skill introuvable"}), 404
+
+
+# ── Admin ──────────────────────────────────────────────────────────────────────
+
+@app.route("/admin")
+def page_admin():
+    return _serve("admin.html")
+
+
+@app.route("/api/admin/utilisateurs")
+@admin_requis
+def api_admin_utilisateurs():
+    return jsonify({"utilisateurs": _auth.lister_utilisateurs()})
+
+
+@app.route("/api/admin/utilisateurs/<int:uid>", methods=["DELETE"])
+@admin_requis
+def api_admin_supprimer_user(uid):
+    _auth.supprimer_utilisateur(uid)
+    return jsonify({"success": True})
+
+
+@app.route("/api/admin/utilisateurs/<int:uid>/role", methods=["POST"])
+@admin_requis
+def api_admin_changer_role(uid):
+    data = request.get_json(force=True, silent=True) or {}
+    role = (data.get("role") or "").strip()
+    try:
+        _auth.changer_role(uid, role)
+        return jsonify({"success": True})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/admin/stats")
+@admin_requis
+def api_admin_stats():
+    _attendre_init()
+    stats = _cerveau.llm.stats() if _cerveau and _cerveau.llm.actif else {}
+    return jsonify({
+        "utilisateurs": len(_auth.lister_utilisateurs()),
+        "modele": stats.get("modele", "Réseau neuronal"),
+        "mode": _cerveau.llm.mode if _cerveau else "2.1",
+        "faits": len(_cerveau.stockage.lister_faits()) if _cerveau else 0,
+        "conversations": len(_cerveau.stockage.lister_conversations()) if _cerveau else 0,
+    })
 
 
 if __name__ == "__main__":

@@ -392,6 +392,32 @@ main {
       </div>
     </div>
 
+    <!-- Skills -->
+    <div class="section">
+      <div class="section-head"><span class="msym">extension</span>Skills</div>
+      <div class="section-body">
+        <p style="font-size:13px;color:var(--txt-dim);margin:0">
+          Les skills permettent à UNION IA de lire et analyser des fichiers spéciaux (PDF, Excel, Access…).
+          Tu peux aussi ajouter des skills personnalisés qui exécutent une commande pour extraire le contenu d'un fichier.
+        </p>
+        <div id="skills-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div class="section-head" style="background:none;border:none;padding:0;margin-top:8px;color:var(--txt-mid);font-size:13px;font-weight:600">
+          Ajouter un skill personnalisé
+        </div>
+        <div class="field"><span class="field-label">Nom du skill</span>
+          <input class="field-input" id="sk-nom" placeholder="Mon skill PDF personnalisé"/></div>
+        <div class="two-col">
+          <div class="field"><span class="field-label">Extensions (ex: pdf,txt)</span>
+            <input class="field-input" id="sk-ext" placeholder="pdf,txt"/></div>
+          <div class="field"><span class="field-label">Description</span>
+            <input class="field-input" id="sk-desc" placeholder="Extrait le texte de…"/></div>
+        </div>
+        <div class="field"><span class="field-label">Commande (utilise {fichier} pour le chemin)</span>
+          <input class="field-input" id="sk-cmd" placeholder="pdftotext {fichier} -"/></div>
+        <div><button class="btn" onclick="ajouterSkill()"><span class="msym" style="font-size:16px">add</span>Ajouter</button></div>
+      </div>
+    </div>
+
     <!-- Apparence -->
     <div class="section">
       <div class="section-head"><span class="msym">palette</span>Apparence &amp; profil</div>
@@ -620,10 +646,66 @@ function esc(t) {
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Skills ─────────────────────────────────────────────────────────────────────
+async function loadSkills() {
+  try {
+    const d = await (await fetch('/api/skills')).json();
+    const list = document.getElementById('skills-list');
+    list.innerHTML = '';
+    for (const s of (d.skills || [])) {
+      const div = document.createElement('div');
+      div.className = 'fact';
+      div.innerHTML = `
+        <span class="fact-cat">${esc(s.type || 'intégré')}</span>
+        <span class="fact-val">
+          <strong>${esc(s.nom)}</strong>
+          <span style="color:var(--txt-dim);font-size:12px;margin-left:8px">.${(s.extensions || []).join(', .')}</span>
+          ${s.description ? `<br><span style="font-size:12px;color:var(--txt-dim)">${esc(s.description)}</span>` : ''}
+        </span>
+        ${s.type === 'custom' ? `<button class="fact-del" title="Supprimer" onclick="supprimerSkill('${esc(s.id)}')"><span class="msym" style="font-size:16px">close</span></button>` : ''}
+      `;
+      list.appendChild(div);
+    }
+    if (!d.skills || !d.skills.length) {
+      list.innerHTML = '<div class="fact-empty">Aucun skill disponible.</div>';
+    }
+  } catch {}
+}
+
+async function ajouterSkill() {
+  const nom = document.getElementById('sk-nom').value.trim();
+  const ext = document.getElementById('sk-ext').value.trim().split(',').map(e => e.trim()).filter(Boolean);
+  const desc = document.getElementById('sk-desc').value.trim();
+  const cmd = document.getElementById('sk-cmd').value.trim();
+  if (!nom || !ext.length || !cmd) {
+    alert('Remplis au minimum : Nom, Extensions, Commande.');
+    return;
+  }
+  const r = await fetch('/api/skills', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nom, extensions: ext, description: desc, commande: cmd }),
+  });
+  const d = await r.json();
+  if (d.success) {
+    document.getElementById('sk-nom').value = '';
+    document.getElementById('sk-ext').value = '';
+    document.getElementById('sk-desc').value = '';
+    document.getElementById('sk-cmd').value = '';
+    loadSkills();
+  }
+}
+
+async function supprimerSkill(id) {
+  if (!confirm('Supprimer ce skill ?')) return;
+  await fetch('/api/skills/' + encodeURIComponent(id), { method: 'DELETE' });
+  loadSkills();
+}
+
 loadStatus();
 loadEngines();
 loadModes();
 loadMemory();
+loadSkills();
 </script>
 </body>
 </html>

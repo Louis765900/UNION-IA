@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "web/server.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "web/server.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": ".",
+    "DONNEES_DIR": "/tmp/donnees"
+  }
+}
