@@ -383,6 +383,7 @@ main {
       <div class="section-head"><span class="msym">database</span>Mémoire active</div>
       <div class="section-body">
         <p style="font-size:13px;color:var(--txt-dim);margin:0">Tout ce que UNION IA a retenu sur toi. Tu peux ajouter, modifier ou oublier chaque élément.</p>
+        <div id="fact-categories" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
         <div class="fact-list" id="fact-list"></div>
         <div class="add-fact-row">
           <input class="field-input" id="fact-input" placeholder="Ajouter un fait (ex : Préfère les réponses courtes)"/>
@@ -613,26 +614,57 @@ async function switchMode(id) {
 }
 
 // ── Mémoire active ─────────────────────────────────────────────────────────────
+let _tousFaits = [];
+let _categorieActive = 'all';
+
 async function loadMemory() {
   try {
     const d = await (await fetch('/api/memory')).json();
-    const list = document.getElementById('fact-list');
-    list.innerHTML = '';
-    const faits = d.faits || [];
-    if (!faits.length) {
-      list.innerHTML = '<div class="fact-empty">Aucun souvenir pour l\'instant. Parle à UNION IA, il retiendra l\'essentiel.</div>';
-      return;
-    }
-    for (const f of faits) {
-      const div = document.createElement('div');
-      div.className = 'fact';
-      div.innerHTML = `<span class="fact-cat">${esc(f.categorie || 'général')}</span>
-        <span class="fact-val">${esc(f.valeur)}</span>
-        <button class="fact-del" title="Oublier"><span class="msym" style="font-size:16px">close</span></button>`;
-      div.querySelector('.fact-del').onclick = () => forgetFact(f.cle);
-      list.appendChild(div);
-    }
+    _tousFaits = d.faits || [];
+    afficherFaits();
+    afficherFiltresCategories();
   } catch {}
+}
+
+function afficherFiltresCategories() {
+  const container = document.getElementById('fact-categories');
+  if (!container) return;
+  const cats = ['all', ...new Set(_tousFaits.map(f => f.categorie || 'général'))];
+  container.innerHTML = cats.map(c => `
+    <button onclick="filtrerCategorie('${esc(c)}')"
+      style="padding:.2rem .6rem;font-size:11px;border-radius:4px;border:1px solid var(--border);
+             background:${c===_categorieActive?'var(--cyan)':'var(--sfc-mid)'};
+             color:${c===_categorieActive?'var(--bg)':'var(--txt-dim)'};cursor:pointer;font-family:inherit">
+      ${esc(c === 'all' ? 'Tous' : c)}
+    </button>
+  `).join('');
+}
+
+function filtrerCategorie(cat) {
+  _categorieActive = cat;
+  afficherFaits();
+  afficherFiltresCategories();
+}
+
+function afficherFaits() {
+  const list = document.getElementById('fact-list');
+  list.innerHTML = '';
+  const faits = _categorieActive === 'all'
+    ? _tousFaits
+    : _tousFaits.filter(f => (f.categorie || 'général') === _categorieActive);
+  if (!faits.length) {
+    list.innerHTML = `<div class="fact-empty">${_tousFaits.length ? 'Aucun fait dans cette catégorie.' : 'Aucun souvenir pour l\'instant. Parle à UNION IA, il retiendra l\'essentiel.'}</div>`;
+    return;
+  }
+  for (const f of faits) {
+    const div = document.createElement('div');
+    div.className = 'fact';
+    div.innerHTML = `<span class="fact-cat">${esc(f.categorie || 'général')}</span>
+      <span class="fact-val">${esc(f.valeur)}</span>
+      <button class="fact-del" title="Oublier"><span class="msym" style="font-size:16px">close</span></button>`;
+    div.querySelector('.fact-del').onclick = () => forgetFact(f.cle);
+    list.appendChild(div);
+  }
 }
 
 async function addFact() {
