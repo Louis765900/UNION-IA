@@ -25,6 +25,9 @@ donnees/memoire.json
 .venv-test/
 .venv/
 
-# Base de données locale
+# Bases de données locales
 donnees/union_ia.db
 donnees/union_ia.db-*
+donnees/auth.db
+donnees/auth.db-*
+donnees/skills_custom.json
