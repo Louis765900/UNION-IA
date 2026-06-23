@@ -3,5 +3,5 @@ import ConversationsScreen from '../../src/screens/ConversationsScreen';
 
 export default function Page() {
   const router = useRouter();
-  return <ConversationsScreen onSelect={() => router.push('/')} />;
+  return <ConversationsScreen onSelect={() => router.push('/(tabs)/')} />;
 }

@@ -46,11 +46,11 @@ export async function logout() {
   await AsyncStorage.removeItem('auth_token');
 }
 
-// Chat en streaming — retourne chaque fragment via onDelta
+// Chat en streaming — retourne chaque fragment via onDelta avec phase ('think' | 'repondre')
 export async function chatStream(
   message: string,
   convId: string | null,
-  onDelta: (text: string) => void,
+  onDelta: (text: string, phase: 'think' | 'repondre') => void,
   onConvId: (id: string) => void
 ): Promise<void> {
   const url = await getServerUrl();
@@ -80,8 +80,9 @@ export async function chatStream(
       if (!line.startsWith('data: ')) continue;
       try {
         const evt = JSON.parse(line.slice(6));
-        if (evt.phase === 'conversation') onConvId(evt.content);
-        else if (evt.phase === 'repondre') onDelta(evt.content);
+        if (evt.phase === 'conversation') onConvId(String(evt.content));
+        else if (evt.phase === 'repondre') onDelta(evt.content, 'repondre');
+        else if (evt.phase === 'think') onDelta(evt.content, 'think');
       } catch {}
     }
   }
