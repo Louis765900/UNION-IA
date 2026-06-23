@@ -89,20 +89,31 @@ export class ChatPanel {
     #send { background:var(--accent); color:#fff; border:none; border-radius:8px;
             padding:.5rem .9rem; cursor:pointer; font-size:13px; }
     #send:hover { opacity:.9; }
-    .typing { color:var(--muted); font-style:italic; font-size:.85rem; padding:.3rem 0; }
+    .typing { color:var(--muted); font-style:italic; font-size:.85rem; padding:.3rem 0; align-self:flex-start; }
+    .think { color:var(--muted); font-style:italic; font-size:.8rem; border-left:2px solid var(--border);
+             padding:.2rem .5rem; margin-bottom:.4rem; overflow:hidden; max-height:60px; }
     .status-bar { padding:.3rem .7rem; background:var(--surface); border-bottom:1px solid var(--border);
-                  font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:.5rem; }
+                  font-size:.78rem; color:var(--muted); display:flex; align-items:center; gap:.5rem; justify-content:space-between; }
+    .status-left { display:flex; align-items:center; gap:.5rem; }
     .dot { width:6px; height:6px; border-radius:50%; background:var(--muted); }
     .dot.ok { background:#4c9; }
+    .btn-new { background:none; border:1px solid var(--border); border-radius:5px; color:var(--muted);
+               font-size:.75rem; padding:.15rem .5rem; cursor:pointer; }
+    .btn-new:hover { color:var(--text); border-color:var(--accent); }
     pre { background:#111; border:1px solid var(--border); border-radius:6px; padding:.6rem;
-          overflow-x:auto; font-size:.82rem; white-space:pre-wrap; }
+          overflow-x:auto; font-size:.82rem; }
     code { font-family:'Consolas','Courier New',monospace; }
+    strong { color:var(--text); }
+    a { color:var(--accent); }
   </style>
 </head>
 <body>
   <div class="status-bar">
-    <div class="dot" id="dot"></div>
-    <span id="status">Connexion à UNION IA…</span>
+    <div class="status-left">
+      <div class="dot" id="dot"></div>
+      <span id="status">Connexion à UNION IA…</span>
+    </div>
+    <button class="btn-new" onclick="nouvelleConv()">+ Nouveau</button>
   </div>
   <div id="chat">
     <div class="msg msg-ia">Bonjour ! Je suis UNION IA, ton assistant IA. Pose-moi une question ou sélectionne du code dans l'éditeur.</div>
@@ -130,14 +141,34 @@ async function verifierStatut() {
   }
 }
 
+function esc(t) {
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function md2html(t) {
+  // Markdown minimal : gras, code inline, blocs code, paragraphes
+  return t
+    .replace(/```(\\w*)\n([\\s\\S]*?)```/g, (_,l,c)=>`<pre><code>${esc(c)}</code></pre>`)
+    .replace(/`([^`]+)`/g, (_,c)=>`<code>${esc(c)}</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
 function ajouterMsg(role, texte) {
   const chat = document.getElementById('chat');
   const div = document.createElement('div');
   div.className = 'msg msg-' + role;
-  div.textContent = texte;
+  if (role === 'user') div.textContent = texte;
+  else div.innerHTML = md2html(texte);
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
+}
+
+function nouvelleConv() {
+  convId = null;
+  document.getElementById('chat').innerHTML = '<div class="msg msg-ia">Nouvelle conversation. Comment puis-je t\'aider ?</div>';
 }
 
 async function envoyer() {
@@ -182,11 +213,20 @@ async function envoyer() {
         try {
           const evt = JSON.parse(line.slice(6));
           if (evt.phase === 'conversation') { convId = evt.content; }
+          else if (evt.phase === 'think') {
+            typingEl.remove();
+            if (!iaDiv) { iaDiv = ajouterMsg('ia', ''); }
+            let th = iaDiv.querySelector('.think');
+            if (!th) { th = document.createElement('div'); th.className = 'think'; iaDiv.prepend(th); }
+            th.textContent = '💭 ' + evt.content.slice(0, 200);
+          }
           else if (evt.phase === 'repondre') {
             typingEl.remove();
             if (!iaDiv) iaDiv = ajouterMsg('ia', '');
             reponse += evt.content;
-            iaDiv.textContent = reponse;
+            let cnt = iaDiv.querySelector('.ia-cnt');
+            if (!cnt) { cnt = document.createElement('div'); cnt.className = 'ia-cnt'; iaDiv.appendChild(cnt); }
+            cnt.innerHTML = md2html(reponse);
             document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
           }
         } catch(e) {}
