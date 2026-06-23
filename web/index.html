@@ -1145,7 +1145,7 @@ function renderConvItem(id, titre) {
 
 async function openConversation(id) {
   try {
-    const r = await fetch('/api/conversations/' + id);
+    const r = await fetch('/api/conversations/' + id, { headers: _authHeaders() });
     const d = await r.json();
     document.getElementById('chat-thread').innerHTML = '';
     showChat();
@@ -1163,6 +1163,9 @@ async function openConversation(id) {
     setActiveConv(id);
     const ta = document.getElementById('thread-area');
     ta.scrollTop = ta.scrollHeight;
+    // Titre de l'onglet
+    const conv = convs.find(c => c.id === id);
+    if (conv) majTitrePage(conv.titre);
   } catch {}
 }
 
@@ -1635,10 +1638,10 @@ async function newConversation() {
   document.getElementById('chat-thread').innerHTML = '';
   activeConvId = null;
   convs.forEach(c => c.el.classList.remove('active'));
-  // Vider les fichiers attachés
   attachedFiles = [];
   renderAttached();
   showWelcome();
+  majTitrePage('');
   document.getElementById('chat-input').focus();
 }
 
@@ -1650,6 +1653,25 @@ function toast(msg, type = 'ok') {
   el.className = 'show ' + type;
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+
+// ── Raccourcis clavier globaux ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // Ctrl+N ou Cmd+N → nouvelle conversation
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    e.preventDefault();
+    newConversation();
+  }
+  // Escape → fermer le menu modèle si ouvert
+  if (e.key === 'Escape') {
+    const menu = document.getElementById('model-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
+
+// ── Titre dynamique ────────────────────────────────────────────────────────────
+function majTitrePage(titre) {
+  document.title = titre ? `${titre} — UNION IA` : 'UNION IA';
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
