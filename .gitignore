@@ -12,6 +12,9 @@ __pycache__/
 # Données générées / temporaires
 donnees/_progres_generation.json
 donnees/memoire.json
+# Modèle du réseau neuronal — régénéré au 1er lancement (cf. CLAUDE.md)
+donnees/modele.npz
+donnees/metadata.json
 
 # Artefacts système
 12.0.0
